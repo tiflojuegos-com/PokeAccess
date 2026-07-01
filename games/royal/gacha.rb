@@ -1,0 +1,28 @@
+# royal's Gacha screen ([ROYAL] Gacha -> class GachaScene): sprite buttons with @sel (0-4) as the cursor
+# and @banner_sel into @banners for the current banner. refresh redraws on every cursor move and banner
+# change, so read the focused button there (banner announced only when it actually changes), deduped.
+module PokeAccess
+  module GachaRoyal
+    BUTTONS = ["Información", "Tirar x1", "Tirar x10", "Elegir recompensa", "Salir"]
+  end
+end
+
+PokeAccess::Game.define("royal") do
+  after("GachaScene", :refresh) do |scn, _ret, _args|
+    sel  = (scn.instance_variable_get(:@sel) rescue nil)
+    bsel = (scn.instance_variable_get(:@banner_sel) rescue nil)
+    last = (scn.instance_variable_get(:@access_gacha) rescue nil)
+    if sel && [sel, bsel] != last
+      banner_changed = last.nil? || last[1] != bsel
+      scn.instance_variable_set(:@access_gacha, [sel, bsel])
+      parts = []
+      if banner_changed
+        bn = (scn.instance_variable_get(:@banners)[bsel].name rescue nil)
+        parts.push("Banner #{bn}") if bn && !bn.to_s.empty?
+      end
+      btn = PokeAccess::GachaRoyal::BUTTONS[sel]
+      parts.push(btn) if btn
+      PokeAccess.speak(PokeAccess.clean(parts.join(". ")), true) unless parts.empty?
+    end
+  end
+end

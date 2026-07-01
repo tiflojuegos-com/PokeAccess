@@ -1,0 +1,138 @@
+# Core load order for PokeAccess (subsystem/module path, no .rb). This is the dependency order, not
+# filename order: add or move a module by editing this list -- no numeric prefixes, no glob. The
+# loader (boot.rb) evals each core/<entry>.rb in this exact order. Keep foundation first.
+#
+# Layout is module-first: each subsystem folder (battle/, menus/, party/, data/, field/...) holds its
+# engine-agnostic readers plus version subfolders for the parts that differ by engine, each gated by
+# class existence so they no-op elsewhere (use Engine.for_engine when behaviour differs by version on
+# the SAME class):
+#   <module>/gen6/     the gen-6 era (Ruby 1.8.7: PokeBattle_Scene, PScreen, PB* data)
+#   <module>/v21/      GameData-era Essentials v19-v21.1 (Battle::Scene, GameData, the pre-rework scenes/MUI)
+#   <module>/v22/      the v22 UI:: rework (UI::BaseScreen / UI::*Visuals)
+#   <module>/skyflyer/ classes specific to La Base de Sky's fork and its bundled plugins (DBK, the
+#                      egg-move tutor...) that are not in vanilla Essentials
+# Everything directly under core/<module>/ stays universal: framework, nav/audio, cross-engine adapters.
+%w[
+  foundation/config
+  foundation/const
+  foundation/paths
+  foundation/i18n
+  util/grouping
+  util/text
+  util/player
+  foundation/game
+  foundation/engine
+  foundation/world
+  foundation/settings
+  foundation/events
+  foundation/caches
+  foundation/clipboard
+  foundation/perf
+  foundation/tags
+  foundation/map_names
+  data/data
+  data/data_fallback
+  data/gen6/data_g6
+  data/v21/data_v21
+  speech/markers
+  speech/text
+  speech/speech
+  input/hooks
+  input/remap
+  input/input
+  menus/config_menu
+  nav/terrain
+  audio/spatial
+  audio/audio3d
+  field/contextual
+  field/minigames
+  puzzles/puzzles
+  field/incubator
+  field/location_banner
+  menus/cursor
+  menus/menus
+  menus/scene_watcher
+  menus/dp_pausemenu
+  menus/neo_pausemenu
+  menus/ready_menu
+  menus/pokegear_theme
+  menus/screen_messages
+  menus/command_help
+  menus/battle_point_shop
+  menus/sprite_button_menu
+  menus/options
+  menus/option_help
+  menus/number_entry
+  menus/text_entry
+  field/minigame_text
+  menus/appearance
+  menus/picture_cues
+  menus/load_screen
+  menus/trainer_card
+  menus/v21/trainer_card_v21
+  battle/battle
+  battle/move_info
+  battle/scene_reader
+  battle/gen6/battle_g6
+  battle/v21/battle_v21
+  battle/v22/battle_v22
+  battle/skyflyer/dbk_battle
+  battle/skyflyer/dbk_moveinfo
+  battle/skyflyer/dbk_battlerinfo
+  battle/skyflyer/dbk_selectors
+  battle/pokedex
+  menus/pokedex_entry
+  battle/v21/pokedex_info_v21
+  menus/purify_chamber
+  menus/encounter_list
+  field/v21/starters_v21
+  field/v21/fieldmoves_v21
+  menus/v21/ui_v21
+  menus/v21/bag_party_v21
+  menus/v21/move_relearner_v21
+  field/achievements
+  field/hall_of_fame
+  menus/v21/pausemenu_v21
+  party/summary_gamedata
+  party/v21/summary_v21
+  party/v21/ribbons_v21
+  field/v21/itemfind_v21
+  menus/skyflyer/eggmove
+  menus/v22/screen_v22
+  menus/v22/options_v22
+  menus/v22/bag_v22
+  menus/v22/pausemenu_v22
+  menus/v22/mart_v22
+  menus/v22/move_reminder_v22
+  menus/v22/load_save_v22
+  menus/v22/trainer_card_v22
+  menus/v22/pokegear_v22
+  party/v22/party_v22
+  party/v22/summary_v22
+  party/v22/storage_v22
+  battle/v22/pokedex_v22
+  nav/v22/town_map_v22
+  party/party_storage
+  party/gen6/party_g6
+  party/v21/party_v21_pause
+  menus/load
+  field/berry
+  nav/locator_naming
+  nav/locator_surfaces
+  party/summary
+  party/gen6/summary_g6
+  nav/region_map
+  nav/locator
+  nav/guide
+  nav/pathfinder
+  dialogue/dialogue
+  field/mail
+  field/fishing
+  field/phone
+  field/tip_cards
+  field/book
+  field/itemfinder
+  field/quests
+  menus/money_window
+  menus/uihelper
+]

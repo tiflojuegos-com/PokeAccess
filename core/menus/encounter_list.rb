@@ -1,0 +1,60 @@
+module PokeAccess
+  # Encounter List UI (a fangame addon: Sky base, Relict, royal's override...): shows the species on the
+  # current map as icons with no text. Both the Sky-base scene and royal's override redraw the focused
+  # encounter type via drawPresent on each left/right change (royal has no pbEncounter loop), so drawPresent
+  # is the single universal hook; drawAbsent fires for a type with no encounters. Reads the focused type's
+  # species list (name + Pokedex status), deduped by @index. No-op without the class.
+  module EncounterList
+    @last = nil
+    MAX = 15
+
+    # Clears the dedup when the scene opens, so reopening at the same type still reads.
+    def self.reset; @last = nil; end
+
+    # Reads the focused encounter type when @index changes.
+    def self.read_present(s)
+      idx = (s.instance_variable_get(:@index) rescue nil)
+      return if idx == @last
+      @last = idx
+      t = text_for(s)
+      PokeAccess.speak(t, true) if t && !t.to_s.empty?
+    rescue StandardError
+      nil
+    end
+
+    # The spoken summary for the scene's current encounter type (type name, species and each one's Pokedex
+    # status, all from live game APIs). getEncData is private in some implementations, so call it via send.
+    def self.text_for(s)
+      enc, key = (s.send(:getEncData) rescue [nil, nil])
+      return nil unless enc.is_a?(Array)
+      type_name = ((::USER_DEFINED_NAMES[key] rescue nil) || (GameData::EncounterType.get(key).real_name rescue nil) || key.to_s)
+      entries = enc.map do |sp|
+        nm = (PokeAccess::Data.species_name(sp) || sp.to_s)
+        dex = (PokeAccess::World.player.pokedex rescue nil)
+        st = (dex.owned?(sp) rescue false) ? :dex_caught :
+             ((dex.seen?(sp) rescue false) ? :dex_seen : :dex_unknown)
+        [nm, st]
+      end
+      summary(type_name, entries)
+    rescue StandardError
+      nil
+    end
+
+    # Formats the type header and species list (name + status), capped so the utterance stays manageable.
+    # Pure (no engine calls), so it is unit-testable.
+    def self.summary(type_name, entries)
+      return nil if entries.nil?
+      head = PokeAccess::I18n.t(:enc_type, :type => type_name, :n => entries.length)
+      return head if entries.empty?
+      shown = entries[0, MAX].map { |nm, st| "#{nm} #{PokeAccess::I18n.t(st)}" }
+      more = entries.length > MAX ? ", " + PokeAccess::I18n.t(:enc_more, :n => entries.length - MAX) : ""
+      "#{head}: #{shown.join(', ')}#{more}"
+    end
+  end
+end
+
+PokeAccess::Hooks.before_hook("EncounterList_Scene", :pbStartScene) { |_s, _a| PokeAccess::EncounterList.reset }
+PokeAccess::Hooks.after_hook("EncounterList_Scene", :drawPresent) { |s, _r, _a| PokeAccess::EncounterList.read_present(s) }
+PokeAccess::Hooks.after_hook("EncounterList_Scene", :drawAbsent) do |_s, _r, _a|
+  PokeAccess.speak(PokeAccess::I18n.t(:enc_none, :loc => ($game_map.name rescue nil).to_s), true)
+end

@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: syntax
+        run: |
+          for f in $(find core games loader test -name '*.rb'); do ruby -c "$f" >/dev/null || exit 1; done
+      - name: tests
+        run: ruby test/run_all.rb
+      - name: profiles
+        run: |
+          for p in africanus anil armonia generic opalo pokemon_z realidea relict reminiscencia royal; do
+            ruby -e "require './test/support/harness'; e = Harness.load_all('$p'); abort('FAIL '+ARGV[0]+': '+e.inspect) unless e.empty?" "$p" || exit 1
+          done

@@ -1,0 +1,11 @@
+EXPORTS
+PA3D_Init
+PA3D_Shutdown
+PA3D_Channel
+PA3D_Listener
+PA3D_Set
+PA3D_Master
+PA3D_Rate
+PA3D_Latency
+PA3D_Occl
+PA3D_Air

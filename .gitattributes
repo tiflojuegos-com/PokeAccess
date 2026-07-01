@@ -1,0 +1,9 @@
+# Keep source files as LF in the repo (mkxp-z reads UTF-8; consistency across platforms).
+* text=auto eol=lf
+
+# Binary assets must never be normalized.
+*.dll binary
+*.wav binary
+*.png binary
+*.rxdata binary
+*.dat binary

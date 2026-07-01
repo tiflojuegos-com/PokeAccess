@@ -1,0 +1,35 @@
+# RuboCop tuned for PokeAccess. Only the Lint department runs (real bugs). Style/Layout/Metrics/
+# Naming fight this mod's deliberate idioms (1.8.7-safe syntax, compact one-liners, short domain
+# names like px/py/dx/dy), so they are off. A few Lint cops are also off because the patterns they
+# flag are intentional here -- see each comment.
+AllCops:
+  TargetRubyVersion: 2.7
+  NewCops: disable
+  Exclude:
+    - 'test/**/*'
+
+Style:
+  Enabled: false
+Layout:
+  Enabled: false
+Metrics:
+  Enabled: false
+Naming:
+  Enabled: false
+# boot.rb / preload_access.rb / Loader.rb eval the mod's own trusted local files by design.
+Security:
+  Enabled: false
+
+# the mod must never crash the host game: the loaders rescue Exception so a syntax error
+# (ScriptError) in one loaded file is logged and skipped instead of fatal.
+Lint/RescueException:
+  Enabled: false
+# log and settings writers swallow IO errors on purpose (a read-only data folder must not crash).
+Lint/SuppressedException:
+  Enabled: false
+# compact `if ... else x end` one-liners are house style.
+Lint/ElseLayout:
+  Enabled: false
+# ping_types fires one positional cue per frame and returns; the early return is deliberate.
+Lint/NonLocalExitFromIterator:
+  Enabled: false

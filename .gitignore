@@ -1,0 +1,28 @@
+# Build artifacts (the release ZIP is built outside the repo, but ignore any local copy)
+*.zip
+Mod_Accesibilidad_Pokemon_*.zip
+
+# Runtime files generated inside a deployed game's accessibility/data folder
+settings.ini
+diag.txt
+hook_loaded.txt
+loader_error.txt
+tags_export.txt
+tags_import.txt
+
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editor
+*.swp
+*~
+
+# graphify analysis output (local only)
+graphify-out/
+
+# native build output and fetched third-party deps (miniaudio.h, Steam Audio SDK)
+native/out/
+native/miniaudio.h
+native/sdk/

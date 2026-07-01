@@ -1,0 +1,39 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.7)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build zip
+        run: |
+          TAG="${{ github.event.inputs.version || github.ref_name }}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          mkdir -p stage
+          cp -r assets core lang loader installer version.json stage/
+          [ -f README.md ] && cp README.md stage/ || true
+          cp -r games stage/games
+          (cd stage && zip -rq "../PokeEssentialsAccess_${TAG}.zip" .)
+      - name: publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="PokeEssentialsAccess_${TAG}.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber
+          else
+            gh release create "$TAG" "$ZIP" --title "${TAG#v}" --notes ""
+          fi

@@ -1,0 +1,38 @@
+# Reek tuned for PokeAccess. The defaults drown the real signal in domain-name and defensive-style
+# noise, so those detectors are off and the size thresholds raised; what remains flags genuinely
+# large methods and real smells.
+detectors:
+  UncommunicativeVariableName:
+    enabled: false
+  UncommunicativeParameterName:
+    enabled: false
+  UncommunicativeMethodName:
+    enabled: false
+  NilCheck:
+    enabled: false
+  DuplicateMethodCall:
+    enabled: false
+  ControlParameter:
+    enabled: false
+  BooleanParameter:
+    enabled: false
+  FeatureEnvy:
+    enabled: false
+  UtilityFunction:
+    enabled: false
+  IrresponsibleModule:
+    enabled: false
+  ManualDispatch:
+    enabled: false
+  TooManyStatements:
+    max_statements: 25
+  LongParameterList:
+    max_params: 6
+  NestedIterators:
+    max_allowed_nesting: 3
+  TooManyConstants:
+    max_constants: 15
+directories:
+  "test":
+    TooManyStatements:
+      enabled: false
