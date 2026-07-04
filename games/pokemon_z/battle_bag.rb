@@ -18,8 +18,8 @@ module PokeAccess
     def self.announce_pockets(bag)
       idx = bag.instance_variable_get(:@index)
       key = "main#{idx}"
-      return if key == @key
-      @key = key
+      return if key == (bag.instance_variable_get(:@access_key) rescue nil)
+      bag.instance_variable_set(:@access_key, key)
       labels = (PokeAccess.const_at("NewBattleBag::PocketText") || [])
       txt = case idx
             when 0, 1, 2, 3 then labels[idx].to_s
@@ -35,16 +35,16 @@ module PokeAccess
     # Speaks the item-list screen entry (item with quantity or back).
     def self.announce_items(bag)
       if bag.instance_variable_get(:@back)
-        return if @key == "back"
-        @key = "back"
+        return if (bag.instance_variable_get(:@access_key) rescue nil) == "back"
+        bag.instance_variable_set(:@access_key, "back")
         return PokeAccess.speak("Atras", true)
       end
       item   = bag.instance_variable_get(:@item)
       pocket = bag.instance_variable_get(:@pocket)
       entry  = (pocket && item) ? pocket[item] : nil
       key = "it#{item}"
-      return if key == @key
-      @key = key
+      return if key == (bag.instance_variable_get(:@access_key) rescue nil)
+      bag.instance_variable_set(:@access_key, key)
       if entry
         PokeAccess::Info.set_info(:item, entry[0])
         PokeAccess.speak("#{PBItems.getName(entry[0])}, #{entry[1]}", true)

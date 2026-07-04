@@ -7,7 +7,7 @@ module PokeAccess
 
     # Starts watching the menu's command window (called by SceneWatcher when the menu opens). Receives the
     # scene and extracts its cmdwindow sprite.
-    def self.watch(scene); @win = ((scene.instance_variable_get(:@sprites) || {})["cmdwindow"] rescue nil); @last = nil; end
+    def self.watch(scene); @win = PokeAccess.sprite(scene, "cmdwindow"); @last = nil; end
 
     # Stops watching (called when the menu closes).
     def self.unwatch; @win = nil; @last = nil; end
@@ -22,7 +22,7 @@ module PokeAccess
       return if idx.nil? || idx < 0 || idx == @last
       @last = idx
       t = (PokeAccess::Menus.generic_focus(w, idx) rescue nil)
-      PokeAccess.speak(PokeAccess.clean(t), true) if t && !t.to_s.empty?
+      PokeAccess.speak_clean(t, true) if t && !t.to_s.empty?
     rescue StandardError
       nil
     end

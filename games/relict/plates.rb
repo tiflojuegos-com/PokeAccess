@@ -6,18 +6,17 @@ PokeAccess::Game.define("relict") do
   # The dedup ivar lives on the battle-long Scene; reset it when the picker (re)opens so reopening on the
   # same plate index still reads.
   before("Battle::Scene", :pbActivateArcyPlates) do |scene, _a|
-    scene.instance_variable_set(:@access_plate_idx, nil)
+    PokeAccess::Cursor.reset(scene, :plate_idx)
   end
   after("Battle::Scene", :rewriteArcyPlates) do |scene, _r, args|
     plates = args[0]; index = args[1]
     next unless plates.is_a?(Array) && index && index >= 0 && index < plates.length
-    next if index == (scene.instance_variable_get(:@access_plate_idx) rescue nil)
-    scene.instance_variable_set(:@access_plate_idx, index)
+    next unless PokeAccess::Cursor.changed?(scene, :plate_idx, index)
     item = plates[index]
     nm = (GameData::Item.get(item).name rescue item.to_s)
     tsym = (::PLATE_TYPES[item] rescue nil)
     tnm = tsym ? (GameData::Type.get(tsym).name rescue nil) : nil
     txt = tnm ? "#{nm}, #{tnm}" : nm.to_s
-    PokeAccess.speak(PokeAccess.clean(txt), true) if txt && !txt.to_s.empty?
+    PokeAccess.speak_clean(txt, true) if txt && !txt.to_s.empty?
   end
 end

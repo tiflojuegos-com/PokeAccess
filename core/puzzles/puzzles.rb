@@ -455,7 +455,7 @@ module PokeAccess
     def self.build_controls(d)
       out = []
       $game_map.events.each_value do |ev|
-        rev = (ev.instance_variable_get(:@event) rescue nil)
+        rev = PokeAccess.ivar(ev, :@event)
         pages = (rev && rev.pages) || []
         next unless pages.any? { |pg| ((pg.trigger rescue 5)) <= 2 }
         w = d[:watch].find { |e| pages.any? { |pg| page_writes_flag?(pg, e) } }

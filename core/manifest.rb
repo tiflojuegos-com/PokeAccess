@@ -90,6 +90,7 @@
   menus/v21/ui_v21
   menus/v21/bag_party_v21
   menus/v21/move_relearner_v21
+  menus/gen6/move_relearner_g6
   field/achievements
   field/hall_of_fame
   menus/v21/pausemenu_v21

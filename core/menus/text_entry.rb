@@ -59,8 +59,8 @@ module PokeAccess
     # Announces the focused grid character or control on cursor/mode change, and echoes an inserted
     # character or a deletion when the entered text changes.
     def self.poll(scene)
-      mode = (scene.instance_variable_get(:@mode) rescue 0)
-      pos = (scene.instance_variable_get(:@cursorpos) rescue nil)
+      mode = PokeAccess.ivar_i(scene, :@mode)
+      pos = PokeAccess.ivar(scene, :@cursorpos)
       txt = (scene.instance_variable_get(:@helper).text rescue "")
       len = txt.scan(/./m).length
       lastlen = scene.instance_variable_get(:@access_len)

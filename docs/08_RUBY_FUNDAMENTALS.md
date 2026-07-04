@@ -135,9 +135,11 @@ increment.call(5)  # → 6
 # Equivalente:
 increment = proc { |x| x + 1 }
 
-# En PokeAccess:
-h = lambda { (x - goal_x).abs + (y - goal_y).abs }
-distance = h.call(10, 20)  # Heurística Manhattan para A*
+# En PokeAccess (core/nav/pathfinder.rb): el A* elige heap o cola con lambdas
+# de un solo argumento, para no ramificar en cada empuje del bucle de búsqueda.
+push = heaped ? lambda { |item| heap_push(heap, item) } : lambda { |item| queue.push(item) }
+push.call([hw * ((px - tx).abs + (py - ty).abs), 0, px, py, 0])
+# La heurística Manhattan va en línea, no en una lambda: (nx - tx).abs + (ny - ty).abs
 ```
 
 ## 7. Hash
@@ -285,12 +287,23 @@ obj.instance_variable_get(:@privado)  # → "secreto"
 obj.instance_variable_set(:@privado, "nuevo")
 ```
 
-**En PokeEssentialsAccess**:
+**En PokeEssentialsAccess**: el mod introspecta objetos del motor por ivar constantemente (el motor no expone accessors)
+y cada lectura debe ser defensiva porque la presencia del ivar varía entre versiones del juego. Por eso NO se usa
+`instance_variable_get` a pelo; hay una primitiva centralizada, 1.8.7-safe, en `core/foundation/const.rb`:
+
 ```ruby
-# Leer el movimiento actual del jugador en batalla
-battler = menu.instance_variable_get(:@battler)
-moves = battler.moves
+# PokeAccess.ivar(obj, :@x, fallback = nil) -- devuelve fallback si el ivar no existe o la lectura lanza
+battler = PokeAccess.ivar(menu, :@battler)
+moves = battler.moves if battler
+
+# PokeAccess.ivar_i(obj, :@x, fallback = 0) -- igual pero coacciona a Integer (para ivars numéricos)
+index = PokeAccess.ivar_i(menu, :@index)
+
+# PokeAccess.sprite(scene, "commandwindow") -- ((@sprites || {})["k"] rescue nil) en una llamada
+win = PokeAccess.sprite(scene, "commandwindow")
 ```
+
+Esto reemplaza el idiom abierto `(obj.instance_variable_get(:@x) rescue nil)` que estaba repetido en ~200 sitios.
 
 ## 12. Alias_method
 
@@ -352,7 +365,7 @@ klass = PokeAccess.const_at("Battle::Scene")
 return if klass.nil?  # No existe → NO hacer nada
 
 # Para gatear por capacidad (clase + método), usa Engine.has?:
-PokeAccess::Engine.has?("Battle::Scene#setIndexAndMode")
+PokeAccess::Engine.has?("Battle::Scene::MenuBase#setIndexAndMode")
 ```
 
 ## 14. Rescue (Manejo de Errores)
@@ -462,8 +475,8 @@ end
 
 **En PokeEssentialsAccess**:
 ```ruby
-# Elegir según engine
-adapter = Engine.gamedata? ? GameDataBattle : GenSixBattle
+# Elegir según engine (así se define Engine.kind en foundation/engine.rb)
+kind = Engine.gamedata? ? :gamedata : :gen6
 ```
 
 ## 18. Lazy Initialization (||=)

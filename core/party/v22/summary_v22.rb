@@ -29,11 +29,11 @@ module PokeAccess
     # changed. Deduped by [page, party_index] so an in-page redraw stays silent. param with_pkmn whether to
     # prepend the Pokemon name/level/hp (used when switching Pokemon with up/down)
     def self.speak(vis, with_pkmn)
-      pk = (vis.instance_variable_get(:@pokemon) rescue nil)
+      pk = PokeAccess.ivar(vis, :@pokemon)
       return unless pk
       PokeAccess::Info.set_info(:pokemon, pk)
-      page = (vis.instance_variable_get(:@page) rescue nil)
-      key = [page, (vis.instance_variable_get(:@party_index) rescue nil)]
+      page = PokeAccess.ivar(vis, :@page)
+      key = [page, PokeAccess.ivar(vis, :@party_index)]
       return unless PokeAccess::Cursor.changed?(vis, :sum_key, key)
       parts = []
       parts.push(PokeAccess::I18n.t(:pk_glance, :name => pk.name, :level => pk.level, :hp => pk.hp, :tot => pk.totalhp)) if with_pkmn
@@ -49,8 +49,8 @@ module PokeAccess
     # learned (@new_move, a Pokemon::Move object in v22) in the extra slot. move_line expects a move id, so
     # pass @new_move.id (it is an object here, not an id, which made the learn slot silent before).
     def self.move_at(vis, mi)
-      pk = (vis.instance_variable_get(:@pokemon) rescue nil)
-      nm = (vis.instance_variable_get(:@new_move) rescue nil)
+      pk = PokeAccess.ivar(vis, :@pokemon)
+      nm = PokeAccess.ivar(vis, :@new_move)
       if nm && mi == Pokemon::MAX_MOVES
         PokeAccess::MoveReminderV22.move_line(nm.respond_to?(:id) ? nm.id : nm)
       else
@@ -63,20 +63,25 @@ module PokeAccess
 end
 
 if PokeAccess::V22.const_exists?("UI::PokemonSummaryVisuals")
-  # :refresh is also bound so the FIRST page is read on open (initialize -> refresh, without any
-  # go_to_*_page call); the [page, party_index] dedup keeps later refreshes (and overlap with the page-nav
-  # hooks) silent.
+  # set_party_index changes the shown Pokemon and then calls refresh INTERNALLY. The hook engine's
+  # reentrancy guard skips that nested refresh hook (a DIFFERENT method than set_party_index), so it neither
+  # speaks the page without the glance nor consumes the [page, party_index] dedup: set_party_index's own
+  # after-hook, running after the original returns, voices the switch WITH the new Pokemon's glance.
+  PokeAccess::Hooks.after_hook("UI::PokemonSummaryVisuals", :set_party_index) do |vis, _ret, _args|
+    PokeAccess::SummaryV22.speak(vis, true)
+  end
+  # :refresh is also bound so the FIRST page is read on open (initialize -> refresh, without any go_to_*_page
+  # call); go_to_next_page / go_to_previous_page each call refresh internally too, but the guard skips that
+  # nested refresh so only the page-nav hook speaks. None of these prepend the glance (page moves, not a
+  # Pokemon switch); the [page, party_index] dedup keeps an in-page redraw silent.
   [:go_to_next_page, :go_to_previous_page, :refresh].each do |m|
     PokeAccess::Hooks.after_hook("UI::PokemonSummaryVisuals", m) do |vis, _ret, _args|
       PokeAccess::SummaryV22.speak(vis, false)
     end
   end
-  PokeAccess::Hooks.after_hook("UI::PokemonSummaryVisuals", :set_party_index) do |vis, _ret, _args|
-    PokeAccess::SummaryV22.speak(vis, true)
-  end
   # Per-move detail while navigating the moves page (deduped by @move_index).
   PokeAccess::Hooks.after_hook("UI::PokemonSummaryVisuals", :refresh_move_cursor) do |vis, _ret, _args|
-    mi = (vis.instance_variable_get(:@move_index) rescue nil)
+    mi = PokeAccess.ivar(vis, :@move_index)
     if mi && PokeAccess::Cursor.changed?(vis, :move_idx, mi)
       t = PokeAccess::SummaryV22.move_at(vis, mi)
       PokeAccess.speak(t, true) if t && !t.to_s.empty?
@@ -85,15 +90,15 @@ if PokeAccess::V22.const_exists?("UI::PokemonSummaryVisuals")
   # Per-ribbon detail while navigating the ribbons page (deduped by @ribbon_index); the page body only
   # announces the count, so this voices each focused ribbon's name and description.
   PokeAccess::Hooks.after_hook("UI::PokemonSummaryVisuals", :refresh_ribbon_cursor) do |vis, _ret, _args|
-    ri = (vis.instance_variable_get(:@ribbon_index) rescue nil)
+    ri = PokeAccess.ivar(vis, :@ribbon_index)
     if ri && PokeAccess::Cursor.changed?(vis, :ribbon_idx, ri)
-      pk  = (vis.instance_variable_get(:@pokemon) rescue nil)
+      pk  = PokeAccess.ivar(vis, :@pokemon)
       rid = pk ? (pk.ribbons[ri] rescue nil) : nil
       rd  = rid ? (GameData::Ribbon.get(rid) rescue nil) : nil
       if rd
         nm = (rd.name rescue rid.to_s); desc = (rd.description rescue "")
         t = (desc && !desc.to_s.empty?) ? "#{nm}. #{desc}" : nm.to_s
-        PokeAccess.speak(PokeAccess.clean(t), true)
+        PokeAccess.speak_clean(t, true)
       end
     end
   end

@@ -58,9 +58,13 @@ module PokeAccess::Audio3D
   LIS  = (Win32API.new(DLL, "PA3D_Listener", ["i", "i"],                "v") rescue nil)
   SET  = (Win32API.new(DLL, "PA3D_Set",      ["i", "i", "i", "i", "i"], "v") rescue nil)
   MAST = (Win32API.new(DLL, "PA3D_Master",   ["i"],                     "v") rescue nil)
-  OCCL = (Win32API.new(DLL, "PA3D_Occl",     ["i", "i"],                "v") rescue nil)
+  RATE_FN = (Win32API.new(DLL, "PA3D_Rate",    [], "i") rescue nil)   # tasa nativa del dispositivo
+  LAT_FN  = (Win32API.new(DLL, "PA3D_Latency", [], "i") rescue nil)   # latencia de salida (ms)
+  OCCL = (Win32API.new(DLL, "PA3D_Occl", ["i", "i"], "v") rescue nil)
+  AIR  = (Win32API.new(DLL, "PA3D_Air",  ["i"],      "v") rescue nil)
+  OCCLUDE_AMOUNT = 80   # cuánto se atenúa (0-100) un emisor tras pared en modo :occlude
 
-  # True si la dll está presente y resolvieron sus puntos de entrada.
+  # True si la dll está presente y resolvieron sus puntos de entrada (OCCL/AIR/RATE/LAT son opcionales).
   def self.available?; INIT && CHAN && LIS && SET && MAST; end
 
   def self.boot
@@ -164,36 +168,51 @@ config.audio3d_freq_door = 70   # Puertas: suena 70% del tiempo
 # Ej: en 100 updates, NPC suena ~70 veces
 ```
 
-### Muting de Emitores Cercanos
+### Alternancia de Emitores Cercanos
 
 ```ruby
-NEAR_MAX = 3      # Máximo 3 emitores cercanos activos
-PING_GAP = 0.25   # Gap mínimo entre pings (0.25s)
+NEAR_MAX = 3      # Máximo 3 emisores cercanos por tipo (se guardan los más próximos)
+PING_GAP = 0.25   # Ventana (s) tras un ping durante la que se retienen los cercanos
 
 # Problema: Si hay 10 NPCs en una zona pequeña,
 # todos sonando simultáneamente = ruido caótico
 
 # Solución:
-# 1. Mantener solo los 3 más cercanos de cada tipo
-# 2. Espaciar pings (no 2 al mismo tiempo)
-# 3. Volumen baja si están muy cerca
+# 1. Mantener solo los 3 más cercanos de cada tipo (NEAR_MAX)
+# 2. Dentro de PING_GAP tras un ping, solo se retienen los candidatos que están
+#    a <= alt_dist tiles de ESE ping; uno más lejos SÍ puede sonar (el HRTF ya los separa).
+# 3. Dentro de un tipo, ping_types recorre en round-robin sus más cercanos para que alternen.
+
+# alt_dist es configurable (audio3d_alt_dist, por defecto 5 tiles):
+def self.alt_dist; (PokeAccess::Config.audio3d_alt_dist rescue 5).to_i; end
 
 @emitters = {}  # { :npc => [[x, y], ...], :object => [...], ... } por tipo, los más cercanos
 
-# El método real por frame es tick (lo llama el hook Game_Player#update). En un cambio de tile
-# re-escanea con rescan(px, py) y dispara los emisores discretos por temporizador con ping_types.
+# El método real por frame es tick (lo llama el hook Game_Player#update). Silencia si sound_nav está
+# :off, si Spatial está ocupado (mensaje/menú) o si estás en menú; en modo distinto a :full deja solo
+# pasos y choques. En un cambio de tile re-escanea (rescan/walls/winds/water); cada frame pinga los
+# emisores discretos por temporizador con ping_types. Cada paso corre aislado en step3d (si uno falla,
+# se loguea una vez y los demás siguen).
 def self.tick
-  return unless boot
+  return unless boot                                  # no arranca si la dll falta o sound_nav=off
   px = $game_player.x; py = $game_player.y
-  LIS.call(px * TILE_UNITS, py * TILE_UNITS)        # listener siempre sobre el jugador
+  LIS.call(px * TILE_UNITS, py * TILE_UNITS)          # listener siempre sobre el jugador
+  return silence_emitters unless nav_full?            # modo != :full: solo pasos/choques
   key = [px, py, $game_map.map_id]
-  if @scan_pos != key                                # solo al cambiar de tile (sondear es caro)
+  if @scan_pos != key                                 # solo al cambiar de tile (sondear es caro)
     @scan_pos = key
-    rescan(px, py)
+    step3d(:rescan) { rescan(px, py) }
+    step3d(:walls)  { update_walls(px, py) }
+    step3d(:winds)  { set_winds(px, py) }
+    step3d(:water)  { set_loop(:water, @near[:water], type_vol(:water)) }
   end
-  ping_types                                          # emite como mucho UN ping por ventana PING_GAP
+  step3d(:ping) { ping_types }                        # emite como mucho UN ping por ventana PING_GAP
 end
 ```
+
+**Modos de `sound_nav`**: `:full` activa todo (pings de npc/objeto/puerta, loop de agua, un loop de viento
+por pared); `:off` no arranca ni siquiera el motor. En cualquier otro modo el motor sigue vivo pero solo
+suenan pasos (`footstep`) y choques (`bump`) — ver `nav_full?`/`nav_off?` en el módulo.
 
 ## Oclusión (Paredes)
 
@@ -252,20 +271,27 @@ end
 # - El aire absorbe menos frecuencias altas
 ```
 
-## Piso/Suelo
+## Mostradores (Desk bypass)
 
 ```ruby
-# Las propiedades del suelo afectan cómo suena
+# En modo :hide, un mostrador de servicio (enfermera/tienda/PC) seguiría oculto tras el
+# mostrador. desk_bypass? lo mantiene audible si está dentro de audio3d_desk_range tiles.
 
 [:audio3d_desk_range, 2, :desk, :audio3d_walls, :lbl_desk_range, :help_desk_range],
-# Rango en tiles para detectar piso/escritorio
+# 0 lo desactiva; 1-3 mantiene audible al empleado tras el mostrador dentro de ese rango.
+
+def self.desk_bypass?(ev, d)
+  dk = (PokeAccess::Config.audio3d_desk_range rescue 2).to_i
+  return false if dk <= 0 || d > dk
+  (PokeAccess::Locator.service_desk?(ev) rescue false)
+end
 ```
 
 ## Rango de Detección
 
 ```ruby
-RANGE = 12            # Rango de sonar (tiles)
-WALL_RANGE = 6        # Rango de paredes (tiles)
+RANGE = 12            # Rango de sonar por defecto (tiles)
+WALL_RANGE = 3        # Rango de paredes por defecto (tiles)
 
 # Configurables:
 [:audio3d_range, 12, :tiles, :audio3d_adv, :lbl_sonar_range, :help_sonar_range],
@@ -360,6 +386,11 @@ end
 [:audio3d_air, false, :flag, :audio3d_walls, :lbl_pos_air, :help_pos_air],
 [:audio3d_wall_range, 3, :tiles, :audio3d_walls, :lbl_wall_range, :help_wall_range],
 [:audio3d_wall_falloff, 50, :vol, :audio3d_walls, :lbl_wall_falloff, :help_wall_falloff],
+[:audio3d_desk_range, 2, :desk, :audio3d_walls, :lbl_desk_range, :help_desk_range],
+
+# Avanzado (rango de sonar y alternancia)
+[:audio3d_range, 12, :tiles, :audio3d_adv, :lbl_sonar_range, :help_sonar_range],
+[:audio3d_alt_dist, 5, :tiles, :audio3d_adv, :lbl_alt_dist, :help_alt_dist],
 ```
 
 ## Diagnóstico

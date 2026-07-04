@@ -8,14 +8,11 @@ module PokeAccess
     def self.say(item, quantity)
       return if item.nil?
       qty = (quantity || 1).to_i
-      data = (GameData::Item.get(item) rescue nil)
-      return if data.nil?
-      name = (qty > 1 ? (data.portion_name_plural rescue nil) : nil) || (data.portion_name rescue nil) ||
-             (data.name rescue nil)
+      name = (qty > 1 ? PokeAccess::Data.item_name_plural(item) : PokeAccess::Data.item_name(item))
       return if name.nil? || name.to_s.empty?
       t = (qty > 1) ? PokeAccess::I18n.t(:ri_found_n, :n => qty, :name => name) :
                       PokeAccess::I18n.t(:ri_found, :name => name)
-      PokeAccess.speak(PokeAccess.clean(t), false)
+      PokeAccess.speak_clean(t, false)
     rescue StandardError
       nil
     end

@@ -12,7 +12,7 @@ de un juego queda muda, este es el flujo para arreglarlo.
 ## 0. El flujo completo, de pantalla muda a pantalla leída
 
 1. **Diagnostica en runtime** (no abras el `Scripts.rxdata` del juego todavía). Entra en la pantalla
-   muda y pulsa **Ctrl+Alt+F9**: vuelca `accessibility/diag.txt` con la sección
+   muda y pulsa **Ctrl+Alt+F9**: vuelca `accessibility/data/diag.txt` con la sección
    `runtime introspection`, que te da la clase del `$scene`, sus métodos propios, sus ivars y las
    ventanas/sprites vivos. Ahí ves **qué método se llama al mover el cursor** y **qué ivar guarda el
    índice o los datos**.
@@ -36,6 +36,7 @@ bloque es una capa fina sobre la API del toolkit (definida en `core/foundation/g
 | `after(clase, metodo)` | Correr código DESPUÉS de un método del juego | `(instancia, resultado, args)` |
 | `before(clase, metodo)` | Correr código ANTES de un método | `(instancia, args)` |
 | `around(clase, metodo)` | Envolver un método (debes llamar `nxt`) | `(instancia, nxt, args)` |
+| `kernel(fname, timing)` | Hookear una función top-level (bare `def`, posible en `Kernel`), p.ej. `pbItemBall` | `(args, retorno)` (`:around` → `(args, nxt)`) |
 | `screen_reader(clase)` | Lector de la opción enfocada de una ventana de comandos | `(ventana, indice) -> texto` |
 | `poll_each_frame` | Correr algo cada frame (para menús con loop propio) | — |
 | `puzzle(map_id, opts)` | Registrar un puzzle de mapa | — |
@@ -81,7 +82,7 @@ cursor, y el índice en un ivar privado. El core no los ve.
 **La receta, siempre la misma (tres pasos):**
 
 1. **Engancha el método de redibujado/selección** que el juego llama en cada movimiento de cursor (y al
-   abrir). Lo descubres con el diag-runtime (sección 7): busca un `selectButton`/`updateCursor`/
+   abrir). Lo descubres con el diag-runtime (sección 8): busca un `selectButton`/`updateCursor`/
    `refresh`/`showTexts`/`pbUpdate*` que corra al mover.
 2. **Lee el ivar del índice** y **el ivar de los datos** (la lista de entradas).
 3. **Deduplica por un ivar de la ESCENA** (`@access_*`) para no repetir la misma entrada cada frame, pero
@@ -94,33 +95,49 @@ cursor, y el índice en un ivar privado. El core no los ve.
 PokeAccess::Game.define("<juego>") do
   after("PokemonMenu_Scene", :selectButton) do |scene, _ret, args|
     idx = args[0]
-    buttons = (scene.instance_variable_get(:@buttons) rescue nil)
+    buttons = PokeAccess.ivar(scene, :@buttons)   # lectura de ivar segura (foundation/const.rb)
     next unless buttons.is_a?(Array) && idx && idx >= 0 && idx < buttons.length
     label = (buttons[idx][1] rescue nil)
-    PokeAccess.speak(PokeAccess.clean(label.to_s), true) if label && !label.to_s.empty?
+    PokeAccess.speak_clean(label.to_s, true) if label && !label.to_s.empty?
   end
 end
 ```
+
+> **`speak_clean` vs `speak`.** `PokeAccess.speak_clean(text, interrupt)` limpia los códigos de control de
+> RPG Maker (`\PN`, `\V[n]`, `\C[n]`...) y habla; es la forma correcta para texto que viene del juego. Si ya
+> tienes una línea limpia (una clave i18n ya resuelta), usa `PokeAccess.speak(text, interrupt)` directo.
+> `PokeAccess.ivar(obj, :@x, fallback)` lee un ivar sin que un objeto raro tumbe el frame.
 
 > Este patrón concreto (menú de pausa de sprites con `selectButton`/`@buttons`) está empaquetado en el
 > core como `core/menus/sprite_button_menu.rb`: un perfil que tenga ese menú se suscribe con una línea,
 > `PokeAccess::SpriteButtonMenu.define("<juego>")`, en vez de repetir el bloque. Escribe el `after(...)`
 > a mano solo si tu pantalla se desvía del patrón.
 
-Cuando el método NO recibe el índice como argumento (solo redibuja), dedupa con un ivar propio:
+Cuando el método NO recibe el índice como argumento (solo redibuja), deduplica con el primitivo `Cursor`
+(`core/menus/cursor.rb`) en vez de un ivar `@access_*` a mano. `Cursor.announce(holder, slot, key) { linea }`
+habla solo cuando `key` cambia respecto a lo último que `slot` guardó EN `holder`, limpia la línea y por
+defecto interrumpe. El estado de dedup vive en la instancia (`holder`), así que muere con la escena y al
+reabrir vuelve a leer:
 
 ```ruby
-# Ejemplo real: selector de bendiciones de Reminiscencia (games/reminiscencia/blessings.rb).
-# updateCursor corre al abrir y en cada izq/der; @index = carta enfocada, @blessings = las 3 cartas.
+# Ejemplo: selector de tipo "elige entre N cartas". updateCursor corre al abrir y en cada izq/der;
+# @index = carta enfocada, @blessings = las cartas. slot (:bless) es un símbolo propio de este lector.
 after("PickBlessing", :updateCursor) do |scene, _r, _a|
-  idx  = (scene.instance_variable_get(:@index) rescue nil)
-  list = (scene.instance_variable_get(:@blessings) rescue nil)
+  idx  = PokeAccess.ivar(scene, :@index)
+  list = PokeAccess.ivar(scene, :@blessings)
   next unless list.is_a?(Array) && idx && idx >= 0 && idx < list.length
-  next if idx == (scene.instance_variable_get(:@access_bless) rescue nil)   # dedup por instancia
-  scene.instance_variable_set(:@access_bless, idx)
-  PokeAccess.speak(texto_de_la_carta(list[idx]), true)
+  PokeAccess::Cursor.announce(scene, :bless, idx) { texto_de_la_carta(list[idx]) }
 end
 ```
+
+> **`first_interrupt` — encolar la primera lectura.** Cuando una pantalla se abre encima de una pregunta o
+> título que aún suena, no quieres que la lectura de apertura lo corte, pero sí que los movimientos
+> posteriores interrumpan. Pásalo como quinto argumento:
+> `Cursor.announce(scene, :bless, idx, true, false) { ... }` — la PRIMERA lectura de un cursor fresco/reseteado
+> (cuando `slot` está `pending?`) usa `false` (encola), y cada movimiento después usa `true` (interrumpe).
+> `Cursor.reset(holder, slot)` fuerza que la siguiente lectura hable aunque el índice no cambie (útil al
+> reabrir una escena con el cursor en la misma entrada). Para gatear trabajo arbitrario sin hablar están
+> `Cursor.changed?`/`on_change`/`pending?`.
 
 > **Otros ejemplos del repo con este mismo patrón**, por si quieres leer código real:
 > `games/relict/plates.rb` (`rewriteArcyPlates`, índice por argumento),
@@ -129,31 +146,84 @@ end
 > selector de tema del Pokégear.
 
 Si el juego **no llama a ningún método** al mover (muta un ivar dentro de un loop propio), usa
-`poll_each_frame` con dedup por el índice anterior — el patrón de `Menus.poll_sprite_menu`:
+`poll_each_frame` (un bloque que corre una vez por frame en toda escena). Para el caso típico "escena con
+`@index` + array de entradas" existe el helper `Menus.poll_sprite_menu(scene, items_ivar, dedup_slot)`
+(`core/menus/menus.rb:16`), que ya lee `@index`, valida el rango y deduplica con `Cursor`; le pasas el ivar
+del array y un `slot` de dedup, y el bloque convierte la entrada enfocada en texto:
 
 ```ruby
 PokeAccess::Game.define("<juego>") do
   poll_each_frame do
     sc = $scene
-    next unless sc.is_a?(MiSceneSpriteBased)  # gate por clase
-    idx = (sc.instance_variable_get(:@index) rescue nil)
-    prev = (sc.instance_variable_get(:@access_idx) rescue nil)
-    if idx && idx != prev
-      sc.instance_variable_set(:@access_idx, idx)
-      PokeAccess.speak(texto_de_la_opcion(sc, idx), true)
+    next unless sc.is_a?(MiSceneSpriteBased)   # gate por clase
+    PokeAccess::Menus.poll_sprite_menu(sc, :@entries, :mi_menu_last) do |entry|
+      texto_de_la_opcion(entry)
     end
   end
 end
 ```
 
-> **Dedup por ivar de la ESCENA, no a nivel de módulo.** Guardar el "último índice leído" en un ivar de
-> la instancia (`@access_idx`) evita que la pantalla quede muda al reabrirse en el mismo estado. Esta es
-> una convención dura del repo: un dedup a nivel de módulo deja la pantalla muda al reabrirla en el
-> mismo estado, así que el "último índice leído" debe vivir en la instancia de la escena.
+Si tu escena se desvía del patrón (índice en otro ivar, clave compuesta), llama a `Cursor.announce` a mano
+como en el ejemplo de `updateCursor` de arriba.
+
+> **Dedup por instancia (vía `Cursor`), no a nivel de módulo.** El estado de dedup vive en la escena
+> (`holder`), así que muere con ella y la pantalla vuelve a leer al reabrirse en el mismo estado. Esta es una
+> convención dura del repo: un dedup a nivel de módulo deja la pantalla muda al reabrirla en el mismo estado.
+> `Cursor` centraliza esto (antes cada lector reinventaba su propio `@access_*` y rompía los casos sutiles:
+> escena fresca que debe releer el mismo índice, clave-tupla `[página, índice]`, texto que cambió sin cambiar
+> el índice).
 
 ---
 
-## 3. Añadir un puzzle
+## 3. Cuando `Game.define` no basta: bajar a `Hooks`
+
+`Game.define` (`after`/`before`/`around`/`poll_each_frame`) cubre casi todo. Dos casos obligan a usar
+directamente `PokeAccess::Hooks` (`core/input/hooks.rb`), porque el original del método que enganchas aloja
+sincrónicamente OTROS lectores hookeados y un `after` normal (que corre bajo la guarda de reentrancia) los
+silenciaría.
+
+**El porqué en una frase:** el juego es mono-hilo; `Hooks` lleva una pila con el nombre del método cuyo
+original está corriendo, y salta cualquier hook anidado de nombre DISTINTO (para que un `after` que llame
+internamente a otro método hookeado no lo re-anuncie ni le robe el dedup). Eso está bien para un *anunciante
+atómico* (su propio cuerpo es la voz), pero es fatal para un método que DELEGA el anuncio a los lectores que
+conduce por dentro. Detalle completo en [04_PATCHING_AND_HOOKS.md](04_PATCHING_AND_HOOKS.md).
+
+### 3a. `hook_container` — un contenedor modal que delega el anuncio
+
+Un bucle modal o abre-escena que no habla él mismo, sino que conduce métodos hookeados (el `drawPage` del
+pokédex, el `drawPageOne` del resumen, el `selected=` del panel de party, el menú de comandos de combate).
+Su original debe correr SIN la guarda o esos lectores internos enmudecen:
+
+```ruby
+PokeAccess::Hooks.after_hook("MiScene", :pbStartScene, :hook_container => true) do |scene, _r, _a|
+  # normalmente vacío: el anuncio lo hacen los lectores que la escena conduce por dentro
+end
+```
+
+### 3b. `frame_hook` — un driver por-frame que anida un bucle modal entero
+
+Un método que el motor llama CADA frame y que puede alojar dentro un bucle modal completo. El caso canónico
+es `Game_Player#update`: en gen-6, pisar hierba lanza el combate salvaje DESDE DENTRO de `update`
+(`Scene_Map#update -> $game_player.update -> encounter -> el combate entero`). Guardarlo fijaría `:update` en
+la pila durante todo el combate y cada lector de batalla (mensajes, menú de comandos, movimientos) se saltaría
+como anidado — el bug clásico "los combates salvajes son mudos, los de entrenador leen" (el de entrenador
+corre desde el intérprete del mapa, no desde el player). `frame_hook` corre el original SIN guarda y el cuerpo
+DESPUÉS (un poller que lee el estado del frame ya actualizado, p.ej. la nueva casilla para el audio espacial):
+
+```ruby
+PokeAccess::Hooks.frame_hook("Game_Player", :update) do |player, _args|
+  # poller: lee el estado ya actualizado del frame; sin valor de retorno que usar
+end
+```
+
+`frame_hook(cname, meth)` es internamente `after_hook(cname, meth, :hook_container => true)` con forma de
+poller. Ambos son 1.8.7-safe. Regla práctica: si tu `after` engancha algo que abre una escena/menú con sus
+propios lectores, o un método por-frame que puede lanzar un combate/menú entero, usa `hook_container`/
+`frame_hook`; para un anunciante atómico, el `after` normal de `Game.define` es lo correcto.
+
+---
+
+## 4. Añadir un puzzle
 
 Los puzzles se registran por mapa con `puzzle(map_id, opts)`. Hay tres tipos (`:kind`):
 
@@ -181,7 +251,7 @@ de cada tipo y sus `opts` están documentados en la cabecera de `core/puzzles/pu
 
 ---
 
-## 4. Crear un perfil de juego nuevo
+## 5. Crear un perfil de juego nuevo
 
 Estructura mínima en `games/<juego>/`:
 
@@ -219,12 +289,12 @@ módulos del core por accidente.
 
 **Engine del juego:** determina si es gen-6 (Ruby 1.8.7: `$Trainer`, `PokeBattle_Scene`, `PBSpecies`) o
 de la era GameData (`$player`, `Battle::Scene`, `GameData`). Si es gen-6, **todo el código del perfil debe pasar
-`check187.py`** (sin `&.`, sin `->`, sin `Array#first(n)`, etc. — ver [08_RUBY_FUNDAMENTALS.md](08_RUBY_FUNDAMENTALS.md)).
+`check187.py`** (sin `&.`, sin `->`, sin `&:sym`, sin `round/ceil/floor(arg)`, etc. — ver [08_RUBY_FUNDAMENTALS.md](08_RUBY_FUNDAMENTALS.md)).
 Añade el perfil a la lista de perfiles que carga el CI (`.github/workflows/ci.yml`).
 
 ---
 
-## 5. Lectores de plugins del fork de Sky (skyflyer / DBK)
+## 6. Lectores de plugins del fork de Sky (skyflyer / DBK)
 
 El fork "La Base de Sky" (Relict, Royal) trae plugins que no existen en Essentials vanilla, sobre todo el
 **Deluxe Battle Kit (DBK)**. Sus lectores viven en `core/battle/skyflyer/` (compartidos por todos los
@@ -261,7 +331,7 @@ juego del fork (p.ej. las placas Arcy, que solo están en Relict) sí va a su pe
 
 ---
 
-## 6. Reglas que evitan los errores recurrentes
+## 7. Reglas que evitan los errores recurrentes
 
 - **i18n siempre.** Texto hablado nuevo = clave en `lang/es.txt` Y `lang/en.txt` (paridad exacta de
   claves). Excepción documentada: strings de juegos gen-6 que solo existen en español pueden quedarse,
@@ -276,14 +346,14 @@ juego del fork (p.ej. las placas Arcy, que solo están en Relict) sí va a su pe
 
 ---
 
-## 7. Diagnosticar una pantalla muda (Ctrl+Alt+F8 / Ctrl+Alt+F9)
+## 8. Diagnosticar una pantalla muda (Ctrl+Alt+F8 / Ctrl+Alt+F9)
 
 Cuando un colaborador (o un usuario) reporta "esta pantalla no lee nada", este es el flujo, sin abrir el
 `Scripts.rxdata` del juego:
 
 1. **Ctrl+Alt+F8** activa/desactiva el mod entero (para confirmar rápido que el mod está cargado y que el
    problema es esa pantalla, no el arranque).
-2. Entra en la pantalla muda y pulsa **Ctrl+Alt+F9**: anexa a `accessibility/diag.txt` (con fecha) un
+2. Entra en la pantalla muda y pulsa **Ctrl+Alt+F9**: anexa a `accessibility/data/diag.txt` (con fecha) un
    bloque con dos partes — los timings de `perf` y la sección `runtime introspection` del `$scene` actual.
 
 La sección `runtime introspection` te da todo lo necesario para escribir el hook:
@@ -294,7 +364,7 @@ La sección `runtime introspection` te da todo lo necesario para escribir el hoo
 - `@sprites keys=[...]` con la clase e índice de cada ventana — para menús basados en `@sprites`.
 - `live_selectables=[...]` — ventanas `Window_Selectable`/`Window_Command` vivas y visibles, incluso si
   no son `Window_DrawableCommand` (si la pantalla aparece aquí, casi seguro el core ya la lee y el
-  problema es otro: un install desfasado, ver sección 6).
+  problema es otro: un install desfasado, ver sección 7).
 
 **Lectura del diagnóstico (qué te dice cada caso):**
 

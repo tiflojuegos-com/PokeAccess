@@ -6,7 +6,7 @@ require File.expand_path("../../../games/awakening/gender", File.dirname(__FILE_
 
 Suite.define("awakening: gender selection speaks boy/girl from @select") do
   g = Object.new
-  PokeAccess::AwakeningGender.holding(g)
+  PokeAccess::AwakeningGender.watch(g)
 
   g.instance_variable_set(:@select, 1); PokeAccess::AwakeningGender.poll
   silent "the initial (no-choice) state says nothing"
@@ -22,5 +22,5 @@ Suite.define("awakening: gender selection speaks boy/girl from @select") do
   g.instance_variable_set(:@select, 4); PokeAccess::AwakeningGender.poll
   silent "an unchanged cursor stays silent (dedup)"
 
-  PokeAccess::AwakeningGender.released
+  PokeAccess::AwakeningGender.unwatch
 end

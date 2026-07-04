@@ -50,7 +50,7 @@ module PokeAccess
 
     # The focused move in the move reminder visuals (its list holds [move_id, "Nv. X"] pairs).
     def self.reminder_move(vis)
-      moves = (vis.instance_variable_get(:@moves) rescue nil)
+      moves = PokeAccess.ivar(vis, :@moves)
       idx = (vis.index rescue (vis.instance_variable_get(:@index) rescue 0))
       return nil unless moves && idx && idx >= 0 && idx < moves.length
       move_from_entry(moves[idx])
@@ -68,10 +68,10 @@ end
 # info so the info key can read its moves/ability.
 PokeAccess::Hooks.after_hook("PokemonPartyPanel", :selected=) do |panel, _r, args|
   if args[0]
-    pk = (panel.instance_variable_get(:@pokemon) rescue nil)
+    pk = PokeAccess.ivar(panel, :@pokemon)
     if pk
       PokeAccess::Info.set_info(:pokemon, pk)
-      ann = (panel.instance_variable_get(:@text) rescue nil)
+      ann = PokeAccess.ivar(panel, :@text)
       PokeAccess::UIV21.speak_changed(:party, PokeAccess::UIV21.party_member(pk, ann))
     end
   end
@@ -94,7 +94,7 @@ end
 # clearing the dedup so reopening the relearner reads it again.
 PokeAccess::Hooks.before_hook("UI::MoveReminder", :main) do |screen, _a|
   PokeAccess::UIV21.reset(:reminder)
-  moves = (screen.instance_variable_get(:@moves) rescue nil)
+  moves = PokeAccess.ivar(screen, :@moves)
   first = moves.is_a?(Array) ? moves[0] : nil
   PokeAccess::UIV21.speak_changed(:reminder, PokeAccess::UIV21.move_from_entry(first)) if first
 end
@@ -104,7 +104,19 @@ PokeAccess::Hooks.after_hook("MapBottomSprite", :maplocation=) do |_s, _r, args|
   PokeAccess::UIV21.speak_changed(:regionmap, PokeAccess.clean(args[0].to_s))
 end
 
+# Clear the region-map dedup when the map screen opens, so reopening reads the location even when the
+# cursor starts on the same place as last time.
+PokeAccess::Hooks.before_hook("PokemonRegionMap_Scene", :pbStartScene) do |_s, _a|
+  PokeAccess::UIV21.reset(:regionmap)
+end
+
 # Pokegear: each option button is (re)selected every frame; read the focused one's name (deduped).
 PokeAccess::Hooks.after_hook("PokegearButton", :selected=) do |btn, _r, args|
   PokeAccess::UIV21.speak_changed(:pokegear, (btn.name rescue nil).to_s) if args[0]
+end
+
+# Clear the pokegear dedup when the pokegear opens, so reopening reads the focused option even when it is
+# the same one focused last time.
+PokeAccess::Hooks.before_hook("PokemonPokegear_Scene", :pbStartScene) do |_s, _a|
+  PokeAccess::UIV21.reset(:pokegear)
 end

@@ -24,7 +24,7 @@ module PokeAccess
     def self.bind_nav(name, ivar)
       bind(name, :update_input) do |menu, _ret, _args|
         idx = (menu.index rescue nil)
-        if idx && idx != (menu.instance_variable_get(ivar) rescue nil)
+        if idx && idx != PokeAccess.ivar(menu, ivar)
           menu.instance_variable_set(ivar, idx)
           PokeAccess::BattleScene.read_menu(menu)
         end

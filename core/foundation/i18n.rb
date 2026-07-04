@@ -51,6 +51,7 @@ module PokeAccess
     # The next language in the cycle (for the language toggle).
     def self.next_language(code)
       langs = available_languages
+      return REFERENCE if langs.empty?
       i = (langs.index(code.to_s.to_sym) || 0)
       langs[(i + 1) % langs.length]
     end
@@ -59,9 +60,11 @@ module PokeAccess
     # suite flag a release with any of: a key present in one language file but missing in another (the usual
     # cause of an English line in a Spanish game); a key DUPLICATED within one file (the later one silently
     # wins); or a key whose %{var} placeholders differ between languages (interpolation breaks in one).
-    # __meta__ keys (starting "__") are ignored. Returns [] when everything is in sync.
+    # __meta__ keys (starting "__") are ignored. Returns [] when everything is in sync. Works on a dup of
+    # the language cache and computes set differences with reject, never Array#-: Pokemon Z's MTS library
+    # redefines Array#- as an in-place mutator, so the literal `-` would empty the @langs cache.
     def self.parity_issues
-      langs = available_languages
+      langs = available_languages.dup
       return [] if langs.length < 2
       tables = {}
       langs.each { |c| tables[c] = table(c) }
@@ -69,7 +72,7 @@ module PokeAccess
       out = []
       all.each do |k|
         present = langs.select { |c| tables[c].key?(k) }
-        (langs - present).each { |c| out.push("#{c}:#{k}: missing") }
+        langs.reject { |c| present.include?(c) }.each { |c| out.push("#{c}:#{k}: missing") }
         next if present.length < 2
         vars = present.map { |c| placeholders(tables[c][k]) }
         out.push("#{k}: placeholders differ (#{present.map { |c| "#{c}=#{placeholders(tables[c][k]).inspect}" }.join(' ')})") unless vars.uniq.length == 1

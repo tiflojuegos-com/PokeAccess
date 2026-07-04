@@ -87,24 +87,60 @@ class Color; def self._load(s); allocate; end; def _dump(d); ""; end; end
 class Tone;  def self._load(s); allocate; end; def _dump(d); ""; end; end
 
 class Game_Player
-  attr_accessor :x, :y, :direction
-  def initialize; @x = 5; @y = 5; @direction = 2; end
+  attr_accessor :x, :y, :direction, :jumping
+  def initialize; @x = 5; @y = 5; @direction = 2; @jumping = false; end
   def update(*a); end
   def passable?(x, y, dir); ($game_map.passable?(x, y, dir) rescue true); end
   def moving?; false; end
+  def jumping?; @jumping; end
 end
 
-# A minimal map event for grid scenarios (x/y/name/sprite/facing -- what the locator reads).
+# A minimal map event for grid scenarios (x/y/name/sprite/facing -- what the locator reads). A test may set
+# @blocking to make the tile it stands on impassable, mirroring a solid event in the real engine.
 class TestEvent
-  attr_accessor :id, :name, :x, :y, :character_name, :direction
-  def initialize(id, name, x, y); @id = id; @name = name; @x = x; @y = y; @character_name = "npc"; @direction = 2; end
+  attr_accessor :id, :name, :x, :y, :character_name, :direction, :blocking
+  def initialize(id, name, x, y); @id = id; @name = name; @x = x; @y = y; @character_name = "npc"; @direction = 2; @blocking = false; end
+end
+
+# Reproduces the surface Terrain/Pathfinder read for one-way ledges: it maps a jump direction to the tileset
+# passage byte the real engine would carry (the side OPPOSITE the jump is the only one left open, matching
+# Pathfinder::LEDGE_OPP_BIT), and it exposes @passages/@terrain_tags/data[x,y,i] so ledge_passage resolves.
+module TestLedge
+  # RMXP passage bit blocked per direction (0x01 down, 0x02 left, 0x04 right, 0x08 up); the byte of a ledge
+  # leaves only the side opposite the jump open, so ledge_dir_ok? permits exactly that jump direction.
+  OPP_BIT = { 2 => 0x08, 8 => 0x01, 4 => 0x04, 6 => 0x02 }
+  TILE_BASE = 1000
+
+  # The synthetic tileset tile id for a ledge whose hop direction is dir (a distinct id per direction so each
+  # carries its own passage byte).
+  def self.tile_id(dir); TILE_BASE + dir; end
+
+  # The passage byte of a ledge with hop direction dir: every side blocked except the one opposite the jump.
+  def self.passage(dir); 0x0F & ~(OPP_BIT[dir] || 0); end
+end
+
+# A stand-in for RMXP's map data Table (data[x,y,layer]): returns the ledge tile id on layer 0 of a ledge
+# tile, 0 elsewhere, which is exactly what ledge_passage walks.
+class TestMapData
+  def initialize(ledges); @ledges = ledges; end
+  def [](x, y, layer)
+    d = @ledges[[x, y]]
+    (d && layer == 0) ? TestLedge.tile_id(d) : 0
+  end
 end
 
 class Game_Map
   attr_accessor :map_id, :width, :height
-  def initialize; @map_id = 1; @width = 20; @height = 20; @events = {}; @grid = nil; end
+
+  def initialize; @map_id = 1; @width = 20; @height = 20; @events = {}; @grid = nil; init_ledges; end
+
   def events; @events; end
-  def terrain_tag(x, y); 0; end
+
+  # The terrain tag at (x,y): 1 on a placed ledge (so Terrain.ledge_at? sees it), else 0.
+  def terrain_tag(x, y); @ledges[[x, y]] ? 1 : 0; end
+
+  # True while (x,y) is inside the map bounds; ledge_jump needs it to accept a landing tile.
+  def valid?(x, y); x >= 0 && y >= 0 && x < @width && y < @height; end
 
   # Loads an ASCII grid so passable?/counter?/events mirror real walls. '#'=wall, '.'=floor, 'C'=counter,
   # '@'=player start, any other letter/digit = an npc event on that tile. Returns self.
@@ -122,28 +158,109 @@ class Game_Map
     end
     self
   end
+
+  # Registers a one-way ledge at (x,y) whose hop direction is dir (2/4/6/8): opt-in and mirroring the real
+  # engine, the tile is passable ONLY when entered moving in dir (from the high side), reads terrain tag 1,
+  # and carries the passage byte that makes ledge_dir_ok? permit exactly dir. Returns self.
+  def place_ledge(x, y, dir)
+    @ledges[[x, y]] = dir
+    tid = TestLedge.tile_id(dir)
+    @terrain_tags[tid] = 1
+    @passages[tid] = TestLedge.passage(dir)
+    self
+  end
+
+  # Clears all placed ledges (the reset calls this so a ledge never leaks between suites).
+  def clear_ledges; init_ledges; end
+
+  # Drops any loaded ASCII grid and restores the default open 20x20 map, so a grid built by one suite does
+  # not leak its walls (or its resized dimensions) into the next, which otherwise assumes open space.
+  def clear_grid; @grid = nil; @width = 20; @height = 20; end
+
   def cell(x, y); (@grid && y >= 0 && x >= 0 && @grid[y] && x < @grid[y].length) ? @grid[y][x, 1] : "#"; end
   def counter?(x, y); cell(x, y) == "C"; end
   def blocked?(x, y); c = cell(x, y); c == "#" || c == "C"; end
-  def passable?(x, y, dir)
-    return true unless @grid
-    dx = (dir == 6 ? 1 : (dir == 4 ? -1 : 0)); dy = (dir == 2 ? 1 : (dir == 8 ? -1 : 0))
-    !blocked?(x + dx, y + dy)
+
+  # True if a blocking event occupies (x,y) (a solid event makes its tile impassable, as in the real engine).
+  def blocking_event_at?(x, y)
+    @events.each_value { |e| return true if e.respond_to?(:blocking) && e.blocking && e.x == x && e.y == y }
+    false
   end
+
+  # Passability of a one-step move from (x,y) in dir. A ledge tile is passable only when approached moving in
+  # its hop direction (high side); a blocking event or a wall blocks the destination; otherwise the grid (or
+  # open space) decides.
+  def passable?(x, y, dir)
+    dx = (dir == 6 ? 1 : (dir == 4 ? -1 : 0)); dy = (dir == 2 ? 1 : (dir == 8 ? -1 : 0))
+    nx = x + dx; ny = y + dy
+    ld = @ledges[[nx, ny]]
+    return dir == ld if ld
+    return false if blocking_event_at?(nx, ny)
+    return true unless @grid
+    !blocked?(nx, ny)
+  end
+
+  # Exposes the passage/terrain-tag tables the real Game_Map carries, so ledge_passage can read them.
+  def init_ledges; @ledges = {}; @passages = {}; @terrain_tags = {}; @data = TestMapData.new(@ledges); end
+  def data; @data; end
 end
 
 class Game_Temp;   attr_accessor :in_menu, :message_window_showing, :in_battle; end
 class Game_System; def map_interpreter; @i ||= Object.new.tap { |o| def o.running?; false; end }; end; end
 class Scene_Map;   def update(*a); end; end
 
+# The selectable-window chain the mod's generic auto-detect net and the command hook bind to, reproduced
+# minimally but with the SAME shape as every engine (gen-6/v21/v22): Window_DrawableCommand descends from
+# SpriteWindow_Selectable, only the base and the leaf own an #update, and the middle class inherits it. This
+# lets menus.rb wrap the real navigation update at load (so the net is not a no-op) and lets specs drive a
+# cursor move by setting @index then calling update, exactly as the game does. #index/#active are the
+# accessors the net reads. A spec that needs a filtered pocket adds #pocket on a subclass.
+class SpriteWindow_Base
+  attr_accessor :active, :visible, :index
+  def initialize; @active = true; @visible = true; @index = 0; end
+  def disposed?; false; end
+end
+class SpriteWindow_Selectable < SpriteWindow_Base
+  def update(*a); @index; end
+end
+class SpriteWindow_SelectableEx < SpriteWindow_Selectable; end
+class Window_DrawableCommand < SpriteWindow_SelectableEx
+  attr_accessor :commands
+  def initialize(commands = []); super(); @commands = commands; end
+  def update(*a); old = self.index; super; refresh if self.index != old; @index; end
+  def refresh; end
+end
+
 # The gen-6 summary scene the readers hook (PokemonSummaryScene#pbUpdate/drawPage*). Defined here so the
-# hooks wrap real methods at load; specs set @pokemon and call the method to drive the wiring.
+# hooks wrap real methods at load; specs set @pokemon and call the method to drive the wiring. pbStartScene
+# mirrors the engine: it draws the first page synchronously during the open (drawPage -> drawPageOne), the
+# chain that the before-hook (reset_reorder) must not silence, so the sheet is read on open.
 class PokemonSummaryScene
   attr_accessor :pokemon
   def initialize(pk = nil); @pokemon = pk; end
   def pbUpdate(*a); end
-  def pbStartScene(*a); end
-  def drawPageOne(*a); end
+  def pbStartScene(party = nil, partyindex = 0, *a)
+    @pokemon = party ? party[partyindex] : @pokemon
+    @page = 1
+    drawPage(@page)
+  end
+  def drawPage(page); drawPageOne(@pokemon) if page == 1; end
+  def drawPageOne(pk = nil); (@pokemon = pk) if pk; end
+end
+
+# The field-move / registered-item menu the v21 reader hooks (SelectMoveMenu_Scene). pbShowCommands is the
+# modal loop; it draws the focused option on open and calls refresh_buttons on each cursor move WITHIN the
+# loop. A spec seeds @nav (the indices the cursor visits) so the loop is deterministic without real input;
+# this is the chain a before-hook (reset+read) must not silence for the after-hook (refresh_buttons) that
+# reads each option as you navigate.
+class SelectMoveMenu_Scene
+  attr_accessor :commands, :index
+  def initialize(commands = [], nav = []); @commands = commands; @index = 0; @nav = nav; end
+  def pbShowCommands(*a)
+    @nav.each { |i| @index = i; refresh_buttons }
+    @index
+  end
+  def refresh_buttons(*a); @index; end
 end
 
 $game_player = Game_Player.new

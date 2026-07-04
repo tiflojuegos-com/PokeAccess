@@ -4,13 +4,12 @@
 # focused card's name and description there, deduped by the chosen card index.
 PokeAccess::Game.define("royal") do
   after("TarjetasLiga_Scene", :actualizarTarjetasPantalla) do |scn, _ret, _args|
-    i = (scn.instance_variable_get(:@tarjeta_elegida) rescue nil)
-    if i && i != (scn.instance_variable_get(:@access_tl) rescue nil)
-      scn.instance_variable_set(:@access_tl, i)
+    i = PokeAccess.ivar(scn, :@tarjeta_elegida)
+    if PokeAccess::Cursor.changed?(scn, :tl, i)
       card = (TarjetasLiga.tarjetas[i] rescue nil)
       if card.is_a?(Array)
         parts = [card[1], card[3]].compact.reject { |s| s.to_s.empty? }
-        PokeAccess.speak(PokeAccess.clean(parts.join(". ")), true) unless parts.empty?
+        PokeAccess.speak_clean(parts.join(". "), true) unless parts.empty?
       end
     end
   end

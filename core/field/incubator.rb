@@ -4,7 +4,7 @@ module PokeAccess
   module Incubator
     # The spoken description of the focused incubator slot, or nil.
     def self.text(scene)
-      idx = (scene.instance_variable_get(:@index) rescue nil)
+      idx = PokeAccess.ivar(scene, :@index)
       return nil if idx.nil?
       eggs = ($PokemonGlobal.eggs rescue nil)
       egg = eggs ? eggs[idx] : nil
@@ -29,7 +29,7 @@ module PokeAccess
 
     # Reads the focused slot when it changes, deduped by slot index across both hooked methods.
     def self.announce(scene)
-      idx = (scene.instance_variable_get(:@index) rescue nil)
+      idx = PokeAccess.ivar(scene, :@index)
       return if idx == scene.instance_variable_get(:@access_hatch_idx)
       scene.instance_variable_set(:@access_hatch_idx, idx)
       t = text(scene)

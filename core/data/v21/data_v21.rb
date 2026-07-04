@@ -11,6 +11,7 @@ module PokeAccess
     def self.move_description(id); GameData::Move.get(id).description; end
     def self.type_name(id);        GameData::Type.get(id).name; end
     def self.item_name(id);        GameData::Item.get(id).name; end
+    def self.item_name_plural(id);  d = GameData::Item.get(id); (d.portion_name_plural rescue nil) || (d.portion_name rescue nil) || d.name; end
     def self.item_description(id); GameData::Item.get(id).description; end
     def self.species_name(id);     GameData::Species.get(id).name; end
     def self.ability_name(id);     GameData::Ability.get(id).name; end

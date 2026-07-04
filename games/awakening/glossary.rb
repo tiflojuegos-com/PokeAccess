@@ -5,32 +5,23 @@ module PokeAccess
   # speaking the focused tab when it changes (deduped).
   module AwakeningGlossary
     @scene = nil
-    @last = nil
 
-    # Holds the live glossary while its blocking main runs; cleared on exit.
-    def self.holding(scene); @scene = scene; @last = nil; end
-    def self.released; @scene = nil; @last = nil; end
+    # SceneWatcher.wire interface: hold the live glossary while its blocking main runs, clear on exit.
+    def self.watch(scene); @scene = scene; PokeAccess::Cursor.reset(self, :tab); end
+    def self.unwatch; @scene = nil; PokeAccess::Cursor.reset(self, :tab); end
 
     # Reads the focused tab name when @index changes on the held glossary.
     def self.poll
       s = @scene
       return unless s
-      idx = (s.instance_variable_get(:@index) rescue nil)
-      cmds = (s.instance_variable_get(:@commands) rescue nil)
+      idx = PokeAccess.ivar(s, :@index)
+      cmds = PokeAccess.ivar(s, :@commands)
       return unless idx && cmds.is_a?(Array) && idx >= 0 && idx < cmds.length
-      return if idx == @last
-      @last = idx
-      PokeAccess.speak(PokeAccess.clean(cmds[idx].to_s), true)
+      PokeAccess::Cursor.announce(self, :tab, idx) { cmds[idx].to_s }
     rescue StandardError
       nil
     end
   end
 end
 
-PokeAccess::Game.define("awakening") do
-  around("Scene_Glosario", :main) do |scene, call_next, _a|
-    PokeAccess::AwakeningGlossary.holding(scene)
-    begin; call_next.call; ensure; PokeAccess::AwakeningGlossary.released; end
-  end
-  poll_each_frame { PokeAccess::AwakeningGlossary.poll }
-end
+PokeAccess::SceneWatcher.wire("Scene_Glosario", :main, PokeAccess::AwakeningGlossary)

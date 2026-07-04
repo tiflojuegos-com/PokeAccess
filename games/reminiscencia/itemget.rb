@@ -10,13 +10,12 @@ module PokeAccess
       name = if item.is_a?(String)
                item
              else
-               id = (getID(PBItems, item) rescue item)
-               (qty > 1 ? (PBItems.getNamePlural(id) rescue nil) : nil) || (PBItems.getName(id) rescue nil)
+               qty > 1 ? PokeAccess::Data.item_name_plural(item) : PokeAccess::Data.item_name(item)
              end
       return if name.nil? || name.to_s.empty?
       t = (qty > 1) ? PokeAccess::I18n.t(:ri_found_n, :n => qty, :name => name) :
                       PokeAccess::I18n.t(:ri_found, :name => name)
-      PokeAccess.speak(PokeAccess.clean(t), false)
+      PokeAccess.speak_clean(t, false)
     rescue StandardError
       nil
     end

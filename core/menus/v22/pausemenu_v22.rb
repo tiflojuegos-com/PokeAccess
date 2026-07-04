@@ -9,12 +9,12 @@ if PokeAccess::V22.const_exists?("UI::PauseMenuVisuals")
   end
 
   PokeAccess::Hooks.after_hook("UI::PauseMenuVisuals", :update_visuals) do |vis, _ret, _args|
-    cmds = (vis.instance_variable_get(:@commands) rescue nil)
+    cmds = PokeAccess.ivar(vis, :@commands)
     win  = (vis.instance_variable_get(:@sprites)[:commands] rescue nil)
     next unless win && cmds && cmds[1]
     idx = (win.index rescue nil)
     next unless idx && idx >= 0
-    next if idx == (vis.instance_variable_get(:@access_pause_idx) rescue nil)
+    next if idx == PokeAccess.ivar(vis, :@access_pause_idx)
     vis.instance_variable_set(:@access_pause_idx, idx)
     name = cmds[1][idx]
     PokeAccess.speak(name.to_s, true) if name && !name.to_s.empty?

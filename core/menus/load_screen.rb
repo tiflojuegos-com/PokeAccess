@@ -17,12 +17,12 @@ end
 # Opening the list: announce the first row without interrupting the title music/voice.
 PokeAccess::Hooks.after_hook("PokemonLoadScene", :pbDrawSaveCommands) do |_s, _r, args|
   txt = PokeAccess::LoadScreen.savefile_text(args[0], 0)
-  PokeAccess.speak(PokeAccess.clean(txt), false) if txt
+  PokeAccess.speak_clean(txt, false) if txt
 end
 
 # Moving the cursor: announce the now-focused save file, interrupting the previous one.
 PokeAccess::Hooks.after_hook("PokemonLoadScene", :pbMoveSaveSel) do |scene, _r, args|
   files = scene.instance_variable_get(:@savefiles)
   txt = PokeAccess::LoadScreen.savefile_text(files, args[0])
-  PokeAccess.speak(PokeAccess.clean(txt), true) if txt
+  PokeAccess.speak_clean(txt, true) if txt
 end

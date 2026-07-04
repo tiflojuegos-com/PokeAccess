@@ -5,13 +5,12 @@ module PokeAccess
   # species, level) plus its position, deduped by [entry, member].
   module RoyalHallViewer
     def self.read(scene)
-      entry = (scene.instance_variable_get(:@hallEntry) rescue nil)
+      entry = PokeAccess.ivar(scene, :@hallEntry)
       return unless entry.is_a?(Array)
-      pi = (scene.instance_variable_get(:@pokemonIndex) rescue 0).to_i
-      hi = (scene.instance_variable_get(:@hallIndex) rescue 0).to_i
+      pi = PokeAccess.ivar_i(scene, :@pokemonIndex)
+      hi = PokeAccess.ivar_i(scene, :@hallIndex)
       key = [hi, pi]
-      return if key == (scene.instance_variable_get(:@access_hof) rescue nil)
-      scene.instance_variable_set(:@access_hof, key)
+      return unless PokeAccess::Cursor.changed?(scene, :hof, key)
       pk = (entry[pi] rescue nil)
       return unless pk
       total = ($PokemonGlobal.hallOfFame.size rescue 0)
@@ -23,7 +22,7 @@ module PokeAccess
       parts.push(sp) if sp && sp != nm
       lv = (pk.level rescue nil)
       parts.push("nivel #{lv}") if lv
-      PokeAccess.speak(PokeAccess.clean(parts.join(", ")), true)
+      PokeAccess.speak_clean(parts.join(", "), true)
     rescue StandardError
       nil
     end

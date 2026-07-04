@@ -6,8 +6,8 @@ module PokeAccess
   module StartersV21
     # The focused region and its starters, e.g. "Starters of Kanto: Bulbasaur, Charmander, Squirtle".
     def self.text(scene)
-      opts = (scene.instance_variable_get(:@options_to_use) rescue nil)
-      idx  = (scene.instance_variable_get(:@index) rescue nil)
+      opts = PokeAccess.ivar(scene, :@options_to_use)
+      idx  = PokeAccess.ivar(scene, :@index)
       return nil unless opts.is_a?(Array) && idx && opts[idx]
       region = opts[idx][0].to_s
       mons = ((opts[idx][1] || []).map { |s| s ? (GameData::Species.get(s).name rescue s.to_s) : nil }.compact)
@@ -20,7 +20,7 @@ module PokeAccess
     # Speaks the focused region when it changes.
     def self.read(scene)
       t = text(scene)
-      return if t.nil? || t == (scene.instance_variable_get(:@access_starter_last) rescue nil)
+      return if t.nil? || t == PokeAccess.ivar(scene, :@access_starter_last)
       scene.instance_variable_set(:@access_starter_last, t)
       PokeAccess.speak(t, true)
     rescue StandardError

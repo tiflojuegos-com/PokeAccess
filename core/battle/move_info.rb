@@ -33,6 +33,21 @@ module PokeAccess
       nil
     end
 
+    # The spoken detail for a move id resolved through the per-engine Data adapter (PBMoveData on gen-6,
+    # GameData on modern) rather than GameData directly, so a gen-6 reader gets the full line too. nil when
+    # the id resolves to nothing. Used by the gen-6 move relearner, whose ids are plain PBMove integers.
+    def self.by_id_via_data(id)
+      nm = (PokeAccess::Data.move_name(id) rescue nil)
+      return nil if nm.nil? || nm.to_s.empty?
+      ty = (PokeAccess::Data.move_type_name(id) rescue nil)
+      pw = (PokeAccess::Data.move_power(id) rescue 0)
+      acc = (PokeAccess::Data.move_accuracy(id) rescue 0)
+      desc = (PokeAccess::Data.move_description(id) rescue "")
+      line(nm.to_s, ty, pw, acc, :desc => desc)
+    rescue StandardError
+      nil
+    end
+
     # Assembles "name. type. power. accuracy[. pp][. description]" from already-resolved parts. Options:
     # :pp and :total_pp (both required to speak pp), :desc (appended when present and non-blank).
     def self.line(name, type_name, power, accuracy, opts = {})

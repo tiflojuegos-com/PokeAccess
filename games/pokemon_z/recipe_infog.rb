@@ -8,7 +8,7 @@ PokeAccess::Game.define("pokemon_z") do
     idx = args[0]
     if lista.is_a?(Array) && idx && lista[idx]
       nm = (lista[idx][0] rescue nil)
-      PokeAccess.speak(PokeAccess.clean(nm.to_s), true) if nm && !nm.to_s.empty?
+      PokeAccess.speak_clean(nm.to_s, true) if nm && !nm.to_s.empty?
     end
   end
 end

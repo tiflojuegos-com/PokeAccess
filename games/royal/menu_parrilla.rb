@@ -5,13 +5,12 @@
 # "Equipo") is read there, deduped by the selected index.
 PokeAccess::Game.define("royal") do
   after("Menu2", :pbActualizarIconosMenu) do |menu, _ret, _args|
-    items = (menu.instance_variable_get(:@items) rescue nil)
-    idx   = (menu.instance_variable_get(:@selected_item) rescue nil)
+    items = PokeAccess.ivar(menu, :@items)
+    idx   = PokeAccess.ivar(menu, :@selected_item)
     if items.is_a?(Array) && idx && items[idx].is_a?(Array) &&
-       idx != (menu.instance_variable_get(:@access_pm) rescue nil)
-      menu.instance_variable_set(:@access_pm, idx)
+       PokeAccess::Cursor.changed?(menu, :pm, idx)
       label = items[idx][1]
-      PokeAccess.speak(PokeAccess.clean(label.to_s), true) if label && !label.to_s.empty?
+      PokeAccess.speak_clean(label.to_s, true) if label && !label.to_s.empty?
     end
   end
 end

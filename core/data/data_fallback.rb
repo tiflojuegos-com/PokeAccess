@@ -12,6 +12,7 @@ module PokeAccess
     def self.move_description(id); nil; end
     def self.type_name(id);        id.to_s; end
     def self.item_name(id);        id.to_s; end
+    def self.item_name_plural(id);  id.to_s; end
     def self.item_description(id); nil; end
     def self.species_name(id);     id.to_s; end
     def self.species_entry(id);    [id.to_s, nil, nil]; end

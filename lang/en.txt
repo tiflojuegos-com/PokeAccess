@@ -665,6 +665,9 @@ bt_cmd_bag=Bag
 bt_cmd_pokemon=Pokemon
 bt_cmd_run=Run
 bt_cmd_call=Call
+bt_cmd_ball=Ball
+bt_cmd_bait=Bait
+bt_cmd_rock=Rock
 enc_none=%{loc}. No encounters.
 hatch_slot_egg=Egg in incubator %{n}. %{state}
 hatch_slot_empty=Incubator %{n} free
@@ -753,3 +756,13 @@ rem_dating_male=Male
 rem_dating_female=Female
 rem_dating_unknown=Unknown
 rem_dating_points=%{name}, %{n} points
+
+# quest log (Marin's Quest)
+qu_ongoing=Ongoing: %{n}
+qu_completed=Completed: %{n}
+qu_none=No quests
+qu_status_done=completed
+qu_status_pending=not completed
+qu_line=%{name}, %{status}
+qu_location=Location: %{loc}. From %{npc}
+qu_detail=%{name}. %{desc}. From %{npc}

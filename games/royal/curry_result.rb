@@ -5,16 +5,16 @@
 # congratulation/happiness lines use pbMessageBlack and are already voiced by the dialogue hook.
 PokeAccess::Game.define("royal") do
   after("ResultadosCurry_Scene", :pbStartScene) do |scr, _ret, _args|
-    curry = (scr.instance_variable_get(:@tipo_de_curry) rescue nil)
+    curry = PokeAccess.ivar(scr, :@tipo_de_curry)
     if curry.is_a?(Array) && curry[1] && !curry[1].to_s.empty?
-      PokeAccess.speak(PokeAccess.clean("Has cocinado #{curry[1]}"), true)
+      PokeAccess.speak_clean("Has cocinado #{curry[1]}", true)
     end
   end
 
   after("ResultadosCurryPuntos_Scene", :pbStartScene) do |scr, _ret, _args|
-    rank = (scr.instance_variable_get(:@pokemon_puntos) rescue nil)
+    rank = PokeAccess.ivar(scr, :@pokemon_puntos)
     if rank && !rank.to_s.empty?
-      PokeAccess.speak(PokeAccess.clean("Digno de un #{rank}"), true)
+      PokeAccess.speak_clean("Digno de un #{rank}", true)
     end
   end
 end

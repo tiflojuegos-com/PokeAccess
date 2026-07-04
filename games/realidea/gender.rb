@@ -14,9 +14,8 @@ end
 
 PokeAccess::Game.define("realidea") do
   after("PokemonGenderSelection", :input) do |scr, _ret, _args|
-    sel = (scr.instance_variable_get(:@select) rescue nil)
-    if sel && sel != (scr.instance_variable_get(:@access_gsel) rescue nil)
-      scr.instance_variable_set(:@access_gsel, sel)
+    sel = PokeAccess.ivar(scr, :@select)
+    if PokeAccess::Cursor.changed?(scr, :gsel, sel)
       lbl = PokeAccess::RealideaGender::LABELS[sel]
       PokeAccess.speak(lbl, true) if lbl && !lbl.to_s.empty?
     end

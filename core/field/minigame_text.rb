@@ -62,7 +62,7 @@ module PokeAccess
 
     # Hand picker: UP/DOWN wrap over the number of cards in hand; speak the focused card.
     def self.poll_hand
-      idxs = (@scene.instance_variable_get(:@cardIndexes) rescue nil)
+      idxs = PokeAccess.ivar(@scene, :@cardIndexes)
       n = (idxs.is_a?(Array) ? idxs.length : 0)
       return if n == 0
       if Input.repeat?(Input::DOWN)
@@ -79,7 +79,7 @@ module PokeAccess
 
     # Board placer: arrows wrap over the grid; speak the cell position and whether it is free or whose it is.
     def self.poll_board
-      bt = (@scene.instance_variable_get(:@battle) rescue nil)
+      bt = PokeAccess.ivar(@scene, :@battle)
       return unless bt
       w = (bt.width rescue 3); h = (bt.height rescue 3)
       if Input.repeat?(Input::DOWN)

@@ -4,7 +4,7 @@ module PokeAccess
   # name on change. pbUpdate marks the selected button each frame.
   module PokegearTheme
     def self.poll(scene)
-      PokeAccess::Menus.poll_sprite_menu(scene, :@commands, :@access_pgtheme_last) { |entry| (entry[1] rescue nil) }
+      PokeAccess::Menus.poll_sprite_menu(scene, :@commands, :pgtheme_last) { |entry| (entry[1] rescue nil) }
     end
   end
 end

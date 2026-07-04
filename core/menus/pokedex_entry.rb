@@ -8,7 +8,7 @@ module PokeAccess
 
     # Info page + species navigation: reads the dummy pokemon the scene just configured.
     def self.gen6_info(scene)
-      pk = (scene.instance_variable_get(:@dummypokemon) rescue nil)
+      pk = PokeAccess.ivar(scene, :@dummypokemon)
       return unless pk
       sp = (pk.species rescue nil)
       nm = (PokeAccess::Data.species_name(sp) || sp.to_s)
@@ -25,7 +25,7 @@ module PokeAccess
     end
 
     def self.gen6_form(scene)
-      g = (scene.instance_variable_get(:@gender) rescue nil); f = (scene.instance_variable_get(:@form) rescue nil)
+      g = PokeAccess.ivar(scene, :@gender); f = PokeAccess.ivar(scene, :@form)
       av = (scene.instance_variable_get(:@available) rescue [])
       hit = (av.find { |i| i[1] == g && i[2] == f } rescue nil)
       PokeAccess.speak(PokeAccess::I18n.t(:dex_form, :form => hit[0]), true) if hit
@@ -34,7 +34,7 @@ module PokeAccess
     end
 
     def self.gen6_area(scene)
-      mb = ((scene.instance_variable_get(:@sprites) || {})["mapbottom"] rescue nil)
+      mb = PokeAccess.sprite(scene, "mapbottom")
       return unless mb
       loc = (mb.maplocation rescue nil); det = (mb.mapdetails rescue nil)
       t = [loc, det].compact.reject { |s| s.to_s.empty? }.join(". ")

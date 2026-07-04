@@ -16,7 +16,7 @@ module PokeAccess
 
     # The spoken text for the focused pokedex page, or nil.
     def self.page_text(scene)
-      species = (scene.instance_variable_get(:@species) rescue nil)
+      species = PokeAccess.ivar(scene, :@species)
       return nil unless species
       form = (scene.instance_variable_get(:@form) rescue 0).to_i
       data = (GameData::Species.get_species_form(species, form) rescue nil)
@@ -76,13 +76,16 @@ module PokeAccess
       parts.join(". ")
     end
 
-    # The dex number shown for the current entry, or nil if not numbered.
+    # The dex number shown for the current entry, or nil if not numbered. Mirrors the entry screen, which
+    # subtracts one from the number when the entry's :shift flag is set (regions in DEXES_WITH_OFFSETS).
     def self.entry_number(scene)
-      dexlist = (scene.instance_variable_get(:@dexlist) rescue nil)
-      idx = (scene.instance_variable_get(:@index) rescue nil)
+      dexlist = PokeAccess.ivar(scene, :@dexlist)
+      idx = PokeAccess.ivar(scene, :@index)
       return nil unless dexlist.is_a?(Array) && idx && dexlist[idx]
-      n = (dexlist[idx][:number] rescue nil)
-      (n && n > 0) ? n : nil
+      entry = dexlist[idx]
+      n = (entry[:number] rescue nil)
+      return nil unless n && n > 0
+      (entry[:shift] rescue false) ? n - 1 : n
     end
 
     # Speaks the focused page if it changed since the last read.
@@ -116,7 +119,7 @@ module PokeAccess
 
     # Reads the focused data-page section name (@cursor) as the cursor moves.
     def self.section_read(scene)
-      k = SECTIONS[(scene.instance_variable_get(:@cursor) rescue nil)]
+      k = SECTIONS[PokeAccess.ivar(scene, :@cursor)]
       data_dedup(k ? PokeAccess::I18n.t(k) : nil)
     rescue StandardError
       nil
@@ -142,12 +145,17 @@ PokeAccess::Hooks.after_hook("PokemonPokedexInfo_Scene", :drawPage) do |scene, _
   PokeAccess::PokedexInfoV21.read(scene)
 end
 
-# Data-page section cursor and species sub-list (MUI Pokedex Data Page plugin).
-PokeAccess::Hooks.after_hook("PokemonPokedexInfo_Scene", :pbDrawDataNotes) do |scene, _r, _a|
-  PokeAccess::PokedexInfoV21.section_read(scene)
+# Data-page section cursor and species sub-list (MUI Pokedex Data Page plugin). Bound only where the
+# plugin's methods exist, so games without it never log a false typo in Hooks.missing.
+if PokeAccess::Engine.has?("PokemonPokedexInfo_Scene#pbDrawDataNotes")
+  PokeAccess::Hooks.after_hook("PokemonPokedexInfo_Scene", :pbDrawDataNotes) do |scene, _r, _a|
+    PokeAccess::PokedexInfoV21.section_read(scene)
+  end
 end
-PokeAccess::Hooks.after_hook("PokemonPokedexInfo_Scene", :pbDrawSpeciesDataList) do |_s, _r, args|
-  PokeAccess::PokedexInfoV21.species_list_read(args[0], args[1], args[2])
+if PokeAccess::Engine.has?("PokemonPokedexInfo_Scene#pbDrawSpeciesDataList")
+  PokeAccess::Hooks.after_hook("PokemonPokedexInfo_Scene", :pbDrawSpeciesDataList) do |_s, _r, args|
+    PokeAccess::PokedexInfoV21.species_list_read(args[0], args[1], args[2])
+  end
 end
 
 # Reset the dedup when an entry's loop begins so reopening reads it again.

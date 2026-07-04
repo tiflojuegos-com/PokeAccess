@@ -49,10 +49,10 @@ end
 if PokeAccess::Engine.has?("Battle::Scene#pbUpdateMoveInfoWindow")
   PokeAccess::Hooks.after_hook("Battle::Scene", :pbUpdateMoveInfoWindow) do |scene, _ret, args|
     battler = args[0]; cw = args[2]
-    if (scene.instance_variable_get(:@enhancedUIToggle) rescue nil) == :move && battler && cw
+    if PokeAccess.ivar(scene, :@enhancedUIToggle) == :move && battler && cw
       idx = (cw.index rescue nil)
       key = idx.nil? ? nil : "mi#{(battler.index rescue 0)}_#{idx}"
-      if key && key != (scene.instance_variable_get(:@access_moveinfo) rescue nil)
+      if key && key != PokeAccess.ivar(scene, :@access_moveinfo)
         scene.instance_variable_set(:@access_moveinfo, key)
         t = PokeAccess::DBKMoveInfo.text(battler, idx, args[1], cw, scene)
         PokeAccess.speak(t, true) if t && !t.to_s.empty?

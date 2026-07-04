@@ -5,40 +5,29 @@ module PokeAccess
   # reads @select off it, speaking the focused class (plus locked state) when it changes (deduped).
   module AwakeningOutfits
     @scene = nil
-    @last = nil
 
-    # Holds the live picker while its blocking initialize runs; cleared on exit.
-    def self.holding(scene)
-      @scene = scene
-      @last = nil
-    end
-    def self.released; @scene = nil; @last = nil; end
+    # SceneWatcher.wire interface: hold the live picker while its blocking initialize runs, clear on exit.
+    def self.watch(scene); @scene = scene; PokeAccess::Cursor.reset(self, :sel); end
+    def self.unwatch; @scene = nil; PokeAccess::Cursor.reset(self, :sel); end
 
     # Reads the focused class name (plus locked state) when @select changes on the held picker.
     def self.poll
       s = @scene
       return unless s
-      sel = (s.instance_variable_get(:@select) rescue nil)
-      arr = (s.instance_variable_get(:@classArray) rescue nil)
-      name = (s.instance_variable_get(:@name) rescue nil)
+      sel = PokeAccess.ivar(s, :@select)
+      arr = PokeAccess.ivar(s, :@classArray)
+      name = PokeAccess.ivar(s, :@name)
       return unless sel && arr.is_a?(Array) && sel >= 0 && sel < arr.length
-      return if sel == @last
-      @last = sel
+      return unless PokeAccess::Cursor.changed?(self, :sel, sel)
       cls = arr[sel].to_s
       return if cls.empty?
       unlocked = (::Fates_Utilities.checkIfHasClass(name, arr[sel]) rescue true)
       txt = unlocked ? cls : "#{cls}, #{PokeAccess::I18n.t(:aw_outfit_locked)}"
-      PokeAccess.speak(PokeAccess.clean(txt), true)
+      PokeAccess.speak_clean(txt, true)
     rescue StandardError
       nil
     end
   end
 end
 
-PokeAccess::Game.define("awakening") do
-  around("Fates_Menu_Personajes", :initialize) do |scene, call_next, _a|
-    PokeAccess::AwakeningOutfits.holding(scene)
-    begin; call_next.call; ensure; PokeAccess::AwakeningOutfits.released; end
-  end
-  poll_each_frame { PokeAccess::AwakeningOutfits.poll }
-end
+PokeAccess::SceneWatcher.wire("Fates_Menu_Personajes", :initialize, PokeAccess::AwakeningOutfits)

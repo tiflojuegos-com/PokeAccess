@@ -12,14 +12,14 @@ module PokeAccess
     def self.poll
       s = @scene
       return unless s
-      page    = (s.instance_variable_get(:@page) rescue 0).to_i
-      photo   = (s.instance_variable_get(:@photo) rescue 0).to_i
+      page    = PokeAccess.ivar_i(s, :@page)
+      photo   = PokeAccess.ivar_i(s, :@photo)
       viewing = (s.instance_variable_get(:@viendofoto) rescue false)
       key = [page, photo, viewing]
       return if key == @last
       @last = key
       idx   = page * 4 + photo
-      total = (s.instance_variable_get(:@numcapturas) rescue 0).to_i
+      total = PokeAccess.ivar_i(s, :@numcapturas)
       pages = (s.instance_variable_get(:@numpages) rescue 1).to_i
       file  = (s.send(:obtener_archivo_captura, idx) rescue nil)
       if file

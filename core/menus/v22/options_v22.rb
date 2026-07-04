@@ -11,7 +11,7 @@ module PokeAccess
       type = (o[:type] rescue nil)
       params = (o[:parameters] rescue nil)
       if type == :control
-        vals = (win.instance_variable_get(:@values) rescue nil)
+        vals = PokeAccess.ivar(win, :@values)
         v = (vals.is_a?(Array) ? vals[i] : nil)
         return nil unless v.is_a?(Array)
         return v.map { |k| k ? (Input.input_name(k) rescue k.to_s) : "---" }.join(", ")
@@ -32,7 +32,7 @@ module PokeAccess
 
     # "name: value" for the focused option, or just the name when there is no simple value.
     def self.line(win)
-      opts = (win.instance_variable_get(:@options) rescue nil)
+      opts = PokeAccess.ivar(win, :@options)
       i = (win.index rescue nil)
       return nil unless opts.is_a?(Array) && i && i >= 0 && opts[i]
       name = (opts[i][:name] rescue nil).to_s
@@ -46,7 +46,7 @@ module PokeAccess
     # Reads the focused option when its index OR its value changes, so left/right value edits are spoken,
     # not only navigation between options.
     def self.poll(win)
-      opts = (win.instance_variable_get(:@options) rescue nil)
+      opts = PokeAccess.ivar(win, :@options)
       i = (win.index rescue nil)
       o = (opts.is_a?(Array) && i && i >= 0) ? opts[i] : nil
       key = [i, (o ? value_text(win, i, o) : nil)]

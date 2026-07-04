@@ -5,7 +5,7 @@
 # the egg-move tutor, so reuse SkyEggMove.detail (defined in menus/skyflyer/eggmove; referenced at runtime,
 # so load order does not matter). Mute the generic bare-name read and speak the full detail on each redraw.
 PokeAccess::Hooks.after_hook("MoveRelearner_Scene", :pbStartScene) do |scene, _r, _a|
-  w = ((scene.instance_variable_get(:@sprites) || {})["commands"] rescue nil)
+  w = PokeAccess.sprite(scene, "commands")
   w.instance_variable_set(:@ignore_input, true) if w
 end
 PokeAccess::Hooks.after_hook("MoveRelearner_Scene", :pbDrawMoveList) do |scene, _r, _a|

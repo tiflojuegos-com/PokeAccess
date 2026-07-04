@@ -29,8 +29,8 @@ module PokeAccess
       stock = scene.instance_variable_get(:@stock)
       ad    = scene.instance_variable_get(:@adapter)
       return unless stock && stock[index] && ad
-      return if index == @list_idx
-      @list_idx = index
+      return if index == (scene.instance_variable_get(:@access_list_idx) rescue nil)
+      scene.instance_variable_set(:@access_list_idx, index)
       recipe = stock[index]
       name = (ad.getName(recipe[0]) rescue recipe[0].to_s)
       ings = recipe[1] || []

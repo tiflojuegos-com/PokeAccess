@@ -94,7 +94,7 @@ module PokeAccess
       o.join("\n")
     end
 
-    # Dumps the full snapshot to accessibility/diag.txt (Ctrl+Alt+F9 and the debug menu's "complete" item).
+    # Dumps the full snapshot to accessibility/data/diag.txt (Ctrl+Alt+F9 and the debug menu's "complete" item).
     def self.diag_dump
       text = diag_build(DIAG_ALL)
       saved = ((File.open("#{PokeAccess::Paths::DATA}/diag.txt", "a") { |f| f.write(text + "\n\n") }; true) rescue false)
@@ -237,7 +237,7 @@ module PokeAccess
         if defined?(ObjectSpace) && defined?(Window_DrawableCommand)
           ObjectSpace.each_object(Window_DrawableCommand) do |w|
             next if (w.disposed? rescue true)
-            cmds = (w.instance_variable_get(:@commands) rescue nil)
+            cmds = PokeAccess.ivar(w, :@commands)
             n = cmds.is_a?(Array) ? cmds.length : "-"
             s0 = (cmds.is_a?(Array) && cmds[0]) ? cmds[0].class.to_s : "-"
             out.push("#{w.class} act=#{w.active rescue '?'} vis=#{w.visible rescue '?'} idx=#{w.index rescue '?'} n=#{n} c0=#{s0}")
@@ -280,7 +280,7 @@ module PokeAccess
     def self.diag_runtime(o)
       o.push("--- runtime introspection (for silent screens) ---")
       sc = dv { $scene }
-      if sc && sc != "ERR" && !sc.nil?
+      if sc && !(sc.is_a?(String) && sc.index("ERR") == 0)
         o.push("$scene=#{dv { sc.class }} methods=#{own_methods(sc.class).inspect[0, 400]}")
         o.push("  ivars: #{ivar_preview(sc).inspect[0, 500]}")
         spr = dv { sc.instance_variable_get(:@sprites) }
@@ -298,7 +298,7 @@ module PokeAccess
       o.push("live_selectables=" + dv {
         out = []
         if defined?(ObjectSpace)
-          [:Window_Selectable, :Window_Command, :Window_CommandPokemon].each do |cn|
+          [:SpriteWindow_Selectable, :Window_CommandPokemon].each do |cn|
             klass = PokeAccess.const_at(cn)
             next if klass.nil?
             ObjectSpace.each_object(klass) do |w|
@@ -317,23 +317,23 @@ module PokeAccess
     def self.diag_reminbag(o)
       return unless defined?(PokeAccess::ReminBag)
       rb = PokeAccess::ReminBag
-      s = (rb.instance_variable_get(:@scene) rescue nil)
+      s = PokeAccess.ivar(rb, :@scene)
       o.push("reminbag: watching=#{!s.nil?} last=#{dv { rb.instance_variable_get(:@last).inspect }}")
       return if s.nil?
-      win = ((s.instance_variable_get(:@sprites) || {})["itemwindow"] rescue nil)
+      win = PokeAccess.sprite(s, "itemwindow")
       o.push("  itemwindow=#{win ? win.class : 'nil'} idx=#{dv { win.index }} pocket=#{dv { win.pocket }} adapter=#{dv { win.instance_variable_get(:@adapter).class }}")
       o.push("  focused_text=#{dv { PokeAccess::Menus.focused_text(win) }.inspect[0, 160]}") if win
     end
 
-    # The per-frame menu pollers plus a micro-benchmark of them, to tell whether the mod's per-frame work
-    # is what makes a custom menu lag. Run while inside the slow menu.
+    # The per-frame menu poller state plus a micro-benchmark of it, to tell whether the mod's per-frame
+    # work is what makes a custom menu lag. Run while inside the slow menu. Only LogrosIndexed polls per
+    # frame; EncounterList is hook-driven (drawPresent/drawAbsent), so it has nothing to bench here.
     def self.diag_polls(o)
       lg = (PokeAccess::LogrosIndexed.instance_variable_get(:@scene) rescue :none)
-      ec = (PokeAccess::EncounterList.instance_variable_get(:@scene) rescue :none)
-      o.push("scene_polls: logros=#{lg.nil? ? 'idle' : (lg == :none ? 'absent' : 'ACTIVE')} enclist=#{ec.nil? ? 'idle' : (ec == :none ? 'absent' : 'ACTIVE')}")
+      o.push("scene_polls: logros=#{lg.nil? ? 'idle' : (lg == :none ? 'absent' : 'ACTIVE')}")
       t0 = (System.uptime rescue Time.now.to_f)
-      5000.times { (PokeAccess::LogrosIndexed.poll rescue nil); (PokeAccess::EncounterList.poll rescue nil) }
-      o.push("poll_bench: 5000x both pollers = #{sprintf('%.2f', ((System.uptime rescue Time.now.to_f) - t0) * 1000)}ms (idle should be ~0)")
+      5000.times { (PokeAccess::LogrosIndexed.poll rescue nil) }
+      o.push("poll_bench: 5000x LogrosIndexed.poll = #{sprintf('%.2f', ((System.uptime rescue Time.now.to_f) - t0) * 1000)}ms (idle should be ~0)")
       aliases = ((class << Input; self; end).instance_methods(false).select { |m| m.to_s =~ /update__access/ } rescue [])
       o.push("input_update_layers: #{aliases.inspect} frame_pollers=#{(@frame_pollers || []).length}")
     rescue Exception => e

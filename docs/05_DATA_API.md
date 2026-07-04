@@ -54,22 +54,19 @@ end
 
 ```ruby
 # core/data/gen6/data_g6.rb -- es un MÓDULO (no una clase con .new). Ruby 1.8.7: sin &.
+# Los resolvers van CRUDOS (sin rescue): PokeAccess::Data.resolve envuelve cada llamada nil-safe.
 module PokeAccess::DataG6
-  def self.species_name(id)
-    PBSpecies.getName(id) rescue nil
-  end
+  def self.species_name(id); PBSpecies.getName(id); end
 end
 
 PokeAccess::Data.register(10, PokeAccess::DataG6) if defined?(PBMoves) && !defined?(GameData)  # Prioridad 10
 
 # core/data/v21/data_v21.rb -- también un MÓDULO
 module PokeAccess::DataV21
-  def self.species_name(id)
-    (GameData::Species.get(id).name rescue nil)
-  end
+  def self.species_name(id); GameData::Species.get(id).name; end
 end
 
-PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData)  # Prioridad 20
+PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData) && defined?(GameData::Move)  # Prioridad 20
 ```
 
 ### Selección Automática
@@ -77,22 +74,30 @@ PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData)  # Prio
 ```ruby
 module PokeAccess::Data
   @providers = []
-  
-  def self.active
-    # Devuelve el provider de MÁS ALTA prioridad registrado
-    entry = @providers.max_by { |pr| pr[0] }
-    entry && entry[1]
+
+  def self.register(priority, provider)
+    @providers.push([priority, provider]); @active_entry = nil
   end
-  
-  def self.species_name(id)
+
+  def self.active_entry
+    # [prioridad, provider] de MÁS ALTA prioridad, memoizado hasta el próximo register
+    @active_entry ||= @providers.max_by { |pr| pr[0] }
+  end
+
+  def self.active
+    e = active_entry; e && e[1]
+  end
+
+  # Cada lector público delega en resolve, que llama al provider activo bajo un begin/rescue
+  def self.species_name(id); resolve(:species_name, id); end
+
+  def self.resolve(method, arg)
     pr = active
     return nil unless pr
-    
     begin
-      pr.send(:species_name, id)
+      pr.send(method, arg)
     rescue StandardError => e
-      # Log error sin crashear
-      note_error(:species_name, e)
+      note_error(method, e)  # Log una sola vez, sin crashear
       nil
     end
   end
@@ -132,6 +137,7 @@ module PokeAccess::Data
   
   # Objeto
   def self.item_name(id)              # "Potion"
+  def self.item_name_plural(id)       # "Potions" (nombre en plural para cantidades > 1)
   def self.item_description(id)       # "Recupera 20 HP..."
   def self.item_id(sym)               # :POTION → 1
   
@@ -150,7 +156,7 @@ module PokeAccess::Data
   def self.status_name(st)            # "Poison" para :POISON
   
   # Pokémon
-  def self.pokemon_types(pk)          # [:fire, :flying]
+  def self.pokemon_types(pk)          # ["Fire", "Flying"] (nombres, no símbolos)
 end
 ```
 
@@ -162,23 +168,16 @@ end
 
 ```ruby
 # Es un MÓDULO con métodos de clase. Ruby 1.8.7: nada de &., -> ni Array#first(n).
+# Resolvers CRUDOS: PokeAccess::Data envuelve cada llamada nil-safe, así no se repite un rescue por método.
 module PokeAccess::DataG6
-  def self.species_name(id)
-    PBSpecies.getName(id) rescue nil
-  end
-
-  def self.move_name(id)
-    PBMoves.getName(id) rescue nil
-  end
-
-  def self.type_name(id)
-    PBTypes.getName(id) rescue nil
-  end
-
-  def self.item_name(id)
-    PBItems.getName(id) rescue nil
-  end
-
+  def self.move_name(id);        PBMoves.getName(id); end
+  def self.move_power(id);       PBMoveData.new(id).basedamage; end
+  def self.move_accuracy(id);    PBMoveData.new(id).accuracy; end
+  def self.move_type_name(id);   PBTypes.getName(PBMoveData.new(id).type); end
+  def self.type_name(id);        PBTypes.getName(id); end
+  def self.item_name(id);        PBItems.getName(id); end
+  def self.item_name_plural(id); PBItems.getNamePlural(id); end
+  def self.species_name(id);     PBSpecies.getName(id); end
   # Más métodos...
 end
 
@@ -197,32 +196,24 @@ PokeAccess::Data.register(10, PokeAccess::DataG6) if defined?(PBMoves) && !defin
 ```ruby
 # También un MÓDULO. Encadena directo (.name); la seguridad ante nil la da Data.resolve, no &.
 module PokeAccess::DataV21
-  def self.species_name(id)
-    (GameData::Species.get(id).name rescue nil)
-  end
+  def self.species_name(id);   GameData::Species.get(id).name; end
+  def self.move_name(id);      GameData::Move.get(id).name; end
+  def self.move_power(id);     GameData::Move.get(id).power; end
+  def self.move_accuracy(id);  GameData::Move.get(id).accuracy; end
+  def self.move_type_name(id); GameData::Type.get(GameData::Move.get(id).type).name; end
+  def self.type_name(id);      GameData::Type.get(id).name; end
+  def self.item_name(id);      GameData::Item.get(id).name; end
 
-  def self.move_name(id)
-    (GameData::Move.get(id).name rescue nil)
-  end
-
-  def self.move_type_name(id)
-    move = GameData::Move.get(id)
-    return nil unless move
-    (GameData::Type.get(move.type).name rescue nil)
-  end
-
-  def self.type_name(id)
-    (GameData::Type.get(id).name rescue nil)
-  end
-
-  def self.item_name(id)
-    (GameData::Item.get(id).name rescue nil)
+  # El plural cae a portion_name_plural, luego portion_name, y por último al nombre singular.
+  def self.item_name_plural(id)
+    d = GameData::Item.get(id)
+    (d.portion_name_plural rescue nil) || (d.portion_name rescue nil) || d.name
   end
 
   # Más métodos...
 end
 
-PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData)
+PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData) && defined?(GameData::Move)
 ```
 
 **¿Qué es GameData?**
@@ -243,6 +234,10 @@ module PokeAccess::DataFallback
   end
 
   def self.move_name(id)
+    id.to_s
+  end
+
+  def self.item_name_plural(id)
     id.to_s
   end
 
@@ -395,7 +390,7 @@ class MyGameDataProvider
   end
 end
 
-PokeAccess::Data.register(75, MyGameDataProvider.new)  # Entre gen6 y era GameData
+PokeAccess::Data.register(75, MyGameDataProvider.new)  # Prioridad 75 > 20 (GameData) > 10 (gen6): gana sobre ambos
 ```
 
 ## Diagnóstico
@@ -427,10 +422,38 @@ puts errors.inspect
 | `PBMoves.getName(id)` | `GameData::Move.get(id).name` | ✓ | `move_name(id)` |
 | `PBTypes.getName(id)` | `GameData::Type.get(id).name` | ✓ | `type_name(id)` |
 | `PBItems.getName(id)` | `GameData::Item.get(id).name` | ✓ | `item_name(id)` |
+| `PBItems.getNamePlural(id)` | `GameData::Item.get(id).portion_name_plural` | ✓ | `item_name_plural(id)` |
 | `PBAbilities.getName(id)` | `GameData::Ability.get(id).name` | ✓ | `ability_name(id)` |
 | `PBNatures.getName(id)` | `GameData::Nature.get(id).name` | ✓ | `nature_name(id)` |
-| No existe | `GameData::Move.get(id).type` | ✓ | `move_type_name(id)` |
-| No existe | `GameData::Move.get(id).power` | ✓ | `move_power(id)` |
+| `PBMoveData.new(id).type` | `GameData::Move.get(id).type` | ✓ | `move_type_name(id)` |
+| `PBMoveData.new(id).basedamage` | `GameData::Move.get(id).power` | ✓ | `move_power(id)` |
+| `PBMoveData.new(id).accuracy` | `GameData::Move.get(id).accuracy` | ✓ | `move_accuracy(id)` |
+
+## MoveInfo: detalle hablado de un movimiento
+
+**Archivo**: `core/battle/move_info.rb`
+
+`PokeAccess::MoveInfo` centraliza el formateo del detalle de un movimiento (nombre, tipo, poder, precisión, descripción) para que todos los lectores de movimientos (combate, relearner, tutores de huevo, página de movimientos del resumen) hablen la misma línea. Antes había copias divergentes que discrepaban (un movimiento de poder 1 llegó a leerse como "sin daño" en combate).
+
+Piezas clave:
+
+- `MoveInfo.power_phrase(pw)` — "sin daño" si el poder es <= 0, "variable" si es 1 (daño fijo o por nivel), si no el número. Textos vía `PokeAccess::I18n.t`.
+- `MoveInfo.accuracy_phrase(acc)` — "nunca falla" si <= 0 (el centinela "siempre acierta" del motor), si no el valor.
+- `MoveInfo.line(name, type_name, power, accuracy, opts = {})` — arma "nombre. tipo. poder. precisión[. pp][. descripción]" a partir de partes ya resueltas. Opciones: `:pp` y `:total_pp` (ambos requeridos para hablar los PP) y `:desc`.
+
+Dos resolutores por id:
+
+```ruby
+# Resuelve vía GameData directamente (compartido por v21 y v22). nil si el id no resuelve.
+PokeAccess::MoveInfo.by_id(id)
+
+# Resuelve a través del adaptador Data por-motor (PBMoveData en gen-6, GameData en moderno),
+# para que un lector gen-6 también reciba la línea completa. Lo usa el move relearner de gen-6,
+# cuyos ids son enteros PBMove planos.
+PokeAccess::MoveInfo.by_id_via_data(id)
+```
+
+`by_id_via_data` encadena `Data.move_name` / `move_type_name` / `move_power` / `move_accuracy` / `move_description` y devuelve nil si el nombre resuelve a vacío. Es el motivo por el que gen-6 SÍ expone poder/precisión/tipo de un movimiento (vía `PBMoveData.new(id)`), no solo el moderno.
 
 ## Referencias
 
@@ -438,6 +461,7 @@ puts errors.inspect
 - [Gen-6 Provider](core/data/gen6/data_g6.rb)
 - [GameData Provider](core/data/v21/data_v21.rb)
 - [Fallback](core/data/data_fallback.rb)
+- [MoveInfo](core/battle/move_info.rb)
 
 ## Próximo
 

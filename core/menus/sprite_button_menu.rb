@@ -9,10 +9,10 @@ module PokeAccess
       PokeAccess::Game.define(game) do
         after("PokemonMenu_Scene", :selectButton) do |scene, _r, args|
           idx = args[0]
-          buttons = (scene.instance_variable_get(:@buttons) rescue nil)
+          buttons = PokeAccess.ivar(scene, :@buttons)
           next unless buttons.is_a?(Array) && idx && idx >= 0 && idx < buttons.length
           label = (buttons[idx][1] rescue nil)
-          PokeAccess.speak(PokeAccess.clean(label.to_s), true) if label && !label.to_s.empty?
+          PokeAccess.speak_clean(label.to_s, true) if label && !label.to_s.empty?
         end
       end
     end

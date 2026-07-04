@@ -127,7 +127,7 @@ module PokeAccessBoot
     load_manifest("#{ROOT}/game")
     
     # 3. Aplicar settings de usuario
-    (PokeAccess::Settings.apply rescue nil) if defined?(PokeAccess::Settings)
+    (PokeAccess::Settings.apply rescue nil) if defined?(PokeAccess) && PokeAccess.const_defined?(:Settings)
     
     # 4. Diagnóstico: ¿hooks faltantes?
     miss = (PokeAccess::Hooks.missing rescue [])
@@ -190,54 +190,60 @@ PokeAccessBoot.run
 %w[
   # Foundation PRIMERO (todo depende)
   foundation/config
+  foundation/const      # const_at: resolución de "A::B::C" 1.8.7-safe (todo depende)
   foundation/paths
   foundation/i18n
-  util/grouping        # helpers puros (union_groups) - sin dependencias
-  util/text            # helpers puros (join_parts, types_phrase)
+  util/grouping         # helpers puros (union_groups) - sin dependencias
+  util/text             # helpers puros (join_parts, types_phrase)
+  util/player
   foundation/game
   foundation/engine
+  foundation/world
   foundation/settings
   foundation/events
+  foundation/caches
   foundation/clipboard
   foundation/perf
   foundation/tags
-  foundation/map_names # nombres de mapa personalizados (depende de Paths)
-  
+  foundation/map_names  # nombres de mapa personalizados (depende de Paths)
+
   # Data (readers agnósticos)
   data/data
   data/data_fallback
   data/gen6/data_g6
   data/v21/data_v21
-  
+
   # Speech (depende de Paths)
   speech/markers
   speech/text
   speech/speech
-  
+
   # Input (depende de Engine, Settings)
   input/hooks
   input/remap
   input/input
-  
-  # Menus (depende de mucho)
+
+  # Menus, Navigation, Audio
   menus/config_menu
-  
-  # Navigation
   nav/terrain
-  
-  # Audio
   audio/spatial
   audio/audio3d
-  
-  # Battle
+
+  # Battle (readers agnósticos + subcarpetas por motor gated por clase)
   battle/battle
   battle/gen6/battle_g6
   battle/v21/battle_v21
   battle/v22/battle_v22
-  
-  # ... más módulos
+
+  # ... más módulos (ver core/manifest.rb para la lista completa)
 ]
 ```
+
+El manifest real define cuatro niveles de subcarpeta por subsistema, cada uno gated por
+existencia de clase para que sea no-op fuera de su motor: `<módulo>/gen6/` (Ruby 1.8.7:
+`PokeBattle_Scene`, `PScreen`, datos `PB*`), `<módulo>/v21/` (era GameData, Essentials v19-v21.1),
+`<módulo>/v22/` (rework `UI::`) y `<módulo>/skyflyer/` (clases del fork de La Base de Sky y sus
+plugins, p.ej. DBK o el tutor de movimientos huevo, ausentes en Essentials vanilla).
 
 **Orden es CRÍTICO:**
 - `foundation/engine` debe cargar ANTES de `data/gen6/` (necesita Engine.kind)
@@ -267,11 +273,14 @@ Solo módulos específicos del juego (el core ya se cargó).
 
 ```json
 {
-  "preloadScript": "accessibility/preload_access.rb",
-  "rtpSearchPath": ".,RTP",
-  "soundFont": "GMGSx.sf2"
+  "preloadScript": ["accessibility/preload_access.rb"]
 }
 ```
+
+`preloadScript` en mkxp-z es un **array** de scripts (no una cadena suelta). El instalador
+(`installer/install.ps1`) inserta `"accessibility/preload_access.rb"` en ese array: si ya existe
+uno, añade la entrada; si no, crea la clave. Ese es el único cambio que hace en el `mkxp.json` del
+juego; el resto de claves (RTP, soundfont, etc.) son del propio juego y el mod no las toca.
 
 **Nota**: el preload es `preload_access.rb`, NO `boot.rb`. boot.rb no puede ser el preloadScript porque
 corre antes de que existan las clases del juego; preload_access.rb difiere la carga (envuelve
@@ -350,9 +359,10 @@ speech/markers.rb
 speech/text.rb
 speech/speech.rb      ← Usa SRAL.dll
     
-input/input.rb
+input/hooks.rb        ← Semi-API de hooks (before/after/around/frame/wrap_*)
     ↑ (depende de Engine, Settings)
-input/hooks.rb
+input/remap.rb
+input/input.rb
     
 menus/menus.rb
     ↑ (depende de Data, Engine, Speech)

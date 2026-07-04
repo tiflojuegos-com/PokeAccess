@@ -11,13 +11,13 @@ module PokeAccess
 
     # Speaks the focused option's name when it changes.
     def self.read(scene)
-      cmds = (scene.instance_variable_get(:@commands) rescue nil)
-      idx  = (scene.instance_variable_get(:@index) rescue nil)
+      cmds = PokeAccess.ivar(scene, :@commands)
+      idx  = PokeAccess.ivar(scene, :@index)
       return unless cmds.is_a?(Array) && idx && cmds[idx]
       name = (cmds[idx][1] rescue nil).to_s
       return if name.empty? || name == @last
       @last = name
-      PokeAccess.speak(PokeAccess.clean(name), true)
+      PokeAccess.speak_clean(name, true)
     rescue StandardError
       nil
     end

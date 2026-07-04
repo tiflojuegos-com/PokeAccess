@@ -48,7 +48,7 @@ PokeEssentialsAccess/
 ├── lang/                    # Traducciones i18n
 ├── assets/                  # Sonidos y voces
 ├── installer/               # Instalador/desinstalador
-├── native/                  # DLLs para audio 3D (PA3D_steam.dll)
+├── native/                  # Fuente C del backend de audio 3D (pa3d_steam.c -> PA3D_steam.dll)
 └── test/                    # Herramientas de testing
 ```
 
@@ -59,9 +59,9 @@ PokeEssentialsAccess/
 El proyecto NO modifica directamente los juegos. En su lugar:
 
 1. Los archivos de PokeEssentialsAccess se colocan en una carpeta `accessibility/`
-2. Se carga un **preload script** a través de `mkxp.json`
-3. El preload espera a que el juego esté listo (cuando `$scene` está definido)
-4. Luego eval()'s el archivo `boot.rb` que inicializa todo
+2. Se carga un **preload script** (`loader/preload_access.rb`) a través de `mkxp.json`
+3. El preload envuelve `Graphics.update` y espera a que el bucle principal corra: dispara cuando `$scene` queda definido, o por un contador de frames de reserva (`READY_FRAME`) para builds que nunca lo asignan
+4. Luego eval()'s el archivo `accessibility/boot.rb` (que llama a `PokeAccessBoot.run`) e inicializa todo
 
 Esta aproximación significa:
 - El juego original NO se modifica
@@ -90,6 +90,8 @@ GameClass.define_method(:method_name) do
   original.bind(self).call
 end
 ```
+
+En la práctica los readers NO escriben este parcheo a mano: usan la semi-API `PokeAccess::Hooks` (`core/input/hooks.rb`), que ofrece `before_hook`, `after_hook`, `around_hook`, `frame_hook`, `wrap_global` y `wrap_kernel` sobre esta misma técnica, con guarda de reentrancia y tragado de excepciones. Ver la documentación de hooks para el detalle.
 
 ### 3. **Versiones de Essentials**
 
@@ -134,7 +136,7 @@ PokeAccessBoot.run
   │  ├─ speech/ (síntesis de voz)
   │  └─ ... (nav, audio, menus, batalla, etc.)
   │
-  ├─ Carga game/<nombre>/ (por manifest)
+  ├─ Carga accessibility/game/ (por manifest)   # el instalador copia el games/<nombre> elegido aquí
   │  └─ Constantes y pantallas específicas del juego
   │
   └─ Aplica PokeAccess::Settings (user overrides)
@@ -146,7 +148,7 @@ PokeAccessBoot.run
 ┌─────────────────────────────────────────┐
 │      Juego Específico (games/<name>)    │  ← Constantes por juego, UI específica
 ├─────────────────────────────────────────┤
-│      Motor Específico (core/*/v21/, v22/) │  ← Adaptadores para Battle::Scene, UI::*
+│  Motor Específico (core/<mod>/gen6|v21|v22|skyflyer) │  ← Adaptadores por versión, gateados por existencia de clase
 ├─────────────────────────────────────────┤
 │      Core Compartido (core/*/*)         │  ← Lógica universal
 ├─────────────────────────────────────────┤
@@ -157,8 +159,9 @@ PokeAccessBoot.run
 ## Siguiente: Leer otros documentos
 
 - [Arquitectura](02_ARCHITECTURE.md) - Detalles de cada capa
-- [Sistemas Core](02_CORE_SYSTEMS.md) - Componentes principales
 - [Detección de Engine](03_ENGINE_DETECTION.md) - Cómo detecta versiones
+- [Parcheo y Hooks](04_PATCHING_AND_HOOKS.md) - La semi-API `PokeAccess::Hooks`
 - [API de Datos](05_DATA_API.md) - Cómo accede a datos de Pokémon
-- [Audio 3D](07_AUDIO3D.md) - Sistema de navegación por sonido
 - [Pathfinding](06_PATHFINDING.md) - Búsqueda de rutas
+- [Audio 3D](07_AUDIO3D.md) - Sistema de navegación por sonido
+- [Sistema de Carga](09_LOADING_SYSTEM.md) - Preload, boot y manifests

@@ -10,11 +10,10 @@ PokeAccess::Game.define("reminiscencia") do
   end
 
   read = lambda do |scene|
-    idx  = (scene.instance_variable_get(:@index) rescue nil)
-    list = (scene.instance_variable_get(:@blessings) rescue nil)
+    idx  = PokeAccess.ivar(scene, :@index)
+    list = PokeAccess.ivar(scene, :@blessings)
     next unless list.is_a?(Array) && idx && idx >= 0 && idx < list.length
-    next if idx == (scene.instance_variable_get(:@access_bless) rescue nil)
-    scene.instance_variable_set(:@access_bless, idx)
+    next unless PokeAccess::Cursor.changed?(scene, :bless, idx)
     data = (BLESSINGS_HASH[list[idx]] rescue nil)
     next unless data.is_a?(Array)
     ck   = cat_key.call(data[0])
@@ -25,7 +24,7 @@ PokeAccess::Game.define("reminiscencia") do
 
   after("PickBlessing", :updateCursor) { |scene, _r, _a| read.call(scene) }
   after("PickBlessing", :swapCard) do |scene, _r, _a|
-    scene.instance_variable_set(:@access_bless, nil)
+    PokeAccess::Cursor.reset(scene, :bless)
     read.call(scene)
   end
 end

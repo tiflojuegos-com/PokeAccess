@@ -24,11 +24,11 @@ module PokeAccess
   module PokedexEntryV22
     # The spoken text for the focused page of the focused species.
     def self.body(vis)
-      data = (vis.instance_variable_get(:@species_data) rescue nil)
-      sp   = (vis.instance_variable_get(:@species) rescue nil)
+      data = PokeAccess.ivar(vis, :@species_data)
+      sp   = PokeAccess.ivar(vis, :@species)
       return nil unless data || sp
       name = (data ? (data.name rescue sp.to_s) : (GameData::Species.get(sp).name rescue sp.to_s))
-      case (vis.instance_variable_get(:@page) rescue nil)
+      case PokeAccess.ivar(vis, :@page)
       when :area then PokeAccess::I18n.t(:pdx_zone, :name => name)
       when :forms
         fn = (data.form_name rescue nil)
@@ -57,7 +57,7 @@ module PokeAccess
 
     # The regional dex number shown for the current entry, or nil.
     def self.dex_number(vis)
-      dex = (vis.instance_variable_get(:@dex) rescue nil)
+      dex = PokeAccess.ivar(vis, :@dex)
       i   = (vis.index rescue nil)
       return nil unless dex.is_a?(Array) && i && dex[i]
       n = dex[i].is_a?(Array) ? dex[i][0] : nil
@@ -68,8 +68,8 @@ module PokeAccess
     def self.speak(vis)
       t = body(vis)
       return if t.nil? || t.to_s.empty?
-      key = [(vis.instance_variable_get(:@page) rescue nil), (vis.index rescue nil)]
-      return if key == (vis.instance_variable_get(:@access_dex_key) rescue nil)
+      key = [PokeAccess.ivar(vis, :@page), (vis.index rescue nil)]
+      return if key == PokeAccess.ivar(vis, :@access_dex_key)
       vis.instance_variable_set(:@access_dex_key, key)
       PokeAccess.speak(t, true)
     rescue StandardError

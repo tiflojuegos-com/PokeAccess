@@ -87,7 +87,10 @@ module PokeAccess
       false
     end
 
-    # Rebuilds the target list for the current category, sorted by distance (nearest first).
+    # Rebuilds the target list for the current category, sorted by distance (nearest first). With "hide
+    # unreachable" on, an empty reachable set is normally treated as a flood-fill misfire and the full list is
+    # kept; the lens category is the exception -- its tiles legitimately sit behind walls the lens reveals, so
+    # an empty result there stays empty rather than falling back to the unreachable list.
     def self.rebuild_targets
       @targets = []
       return unless $game_map && $game_player
@@ -111,10 +114,6 @@ module PokeAccess
       end
       if !synthetic && (PokeAccess::Config.hide_unreachable rescue false)
         reachable_only = @targets.select { |ev| ev.is_a?(SurfaceTarget) || reachable?(ev) }
-        # For most categories an empty result means the flood-fill misfired, so the list is kept rather than
-        # blanked. Lens tiles are the opposite case: they sit behind walls the lens itself reveals, so they
-        # are legitimately unreachable until then -- with "hide unreachable" on, an empty result must stay
-        # empty instead of falling back to the full (unreachable) list.
         if cat == :lens
           @targets = reachable_only
         else
@@ -404,11 +403,20 @@ module PokeAccess
       PokeAccess.speak(nm, false) if nm && !nm.to_s.strip.empty?
     end
 
+    # True while the player is mid-jump, i.e. hopping a ledge (the engine sets @x/@y two tiles at once and
+    # marks @jump_timer, so jumping? is true on that frame). Present in every engine variant (stock RMXP
+    # Game_Character); the rescue keeps a missing method from ever raising here.
+    def self.player_jumping?
+      !!($game_player.jumping? rescue false)
+    end
+
     # Announces an internal teleport: a jump of more than one tile on the SAME map (a within-map warp,
     # staircase or transfer), which announce_map_change never catches because the map id does not change --
     # leaving the player silently relocated. Tracks the last position; a same-map jump beyond a step (and not
     # a forced move route, i.e. a cutscene walk) is spoken with the destination's cardinal direction and the
-    # targets are rebuilt for the new spot. The first frame and any map change just seed the position.
+    # targets are rebuilt for the new spot. A ledge hop also moves two tiles in one frame with no forced
+    # route, so jumping? guards it out -- the announcement and the target rebuild are skipped, keeping the
+    # locator's selection alive across the jump. The first frame and any map change just seed the position.
     def self.announce_internal_teleport
       x = ($game_player.x rescue nil); y = ($game_player.y rescue nil); mid = ($game_map.map_id rescue nil)
       return if x.nil? || y.nil? || mid.nil?
@@ -417,6 +425,7 @@ module PokeAccess
       return if prev.nil? || prev[2] != mid
       jump = (prev[0] - x).abs + (prev[1] - y).abs
       return if jump <= 1
+      return if player_jumping?
       return if ($game_player.move_route_forcing rescue false)
       dir = (cardinal_of(x, y) rescue nil)
       msg = dir ? PokeAccess::I18n.t(:loc_teleported, :dir => PokeAccess::I18n.t(dir)) :
@@ -502,8 +511,10 @@ end
 
 # Per-frame map driver, hooked on Game_Player#update (not Scene_Map#update): some games run their whole
 # map loop inside Scene_Map#update, so an after-hook there would only fire on leaving the map, but
-# Game_Player#update runs each frame on the map in every engine variant.
-PokeAccess::Hooks.after_hook("Game_Player", :update) do |_p, _r, _a|
+# Game_Player#update runs each frame on the map in every engine variant. frame_hook, not after_hook: gen-6
+# runs a whole wild battle inside Game_Player#update, so guarding it would pin the reentrancy stack for the
+# entire fight and mute every battle reader (messages, command menu, moves).
+PokeAccess::Hooks.frame_hook("Game_Player", :update) do |_p, _a|
   PokeAccess::Perf.measure(:map_poll) { PokeAccess::Locator.map_poll }
 end
 

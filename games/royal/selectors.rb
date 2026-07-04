@@ -29,7 +29,7 @@ module PokeAccess
     def self.poll
       s = @scene
       return unless s
-      sel = (s.instance_variable_get(:@select) rescue nil)
+      sel = PokeAccess.ivar(s, :@select)
       return if sel.nil?
       added = (s.instance_variable_get(:@added) rescue [])
       mods = (s.instance_variable_get(:@modifiers) rescue [])

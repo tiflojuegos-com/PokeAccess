@@ -6,15 +6,24 @@ module PokeAccess
   # engine opens/navigates its menus differently), while the spoken content lives here once. On gen-6 there
   # is no Battle::Scene, so nothing here is ever reached (its triggers never bind).
   module BattleScene
-    # The first three command buttons are fixed; the fourth depends on the menu mode. Labels are i18n keys.
-    # Used on v19-v21, whose command menu is position-based.
-    CMD_LABELS = [:bt_cmd_fight, :bt_cmd_bag, :bt_cmd_pokemon]
-    CMD3 = { 0 => :bt_cmd_run, 1 => :pc_cancel, 2 => :bt_cmd_call, 3 => :bt_cmd_run, 4 => :bt_cmd_run }
+    # Positional command labels per menu mode, for the v19-v21 CommandMenu (which exposes neither @texts nor
+    # #command, so it is read by index). Every position is mode-dependent: modes 0-2 are regular battles
+    # (Fight/Bag/Pokemon with Run/Cancel/Call as the fourth button), mode 3 is the Safari Zone
+    # (Ball/Bait/Rock/Run) and mode 4 the Bug-Catching Contest (Fight/Ball/Pokemon/Run) -- both relabel the
+    # first buttons too, so a blind player hears the real button, not the default Fight/Bag/Pokemon. Values
+    # are i18n keys; verified against the Battle::Scene MODES table in Essentials master.
+    CMD_MODES = { 0 => [:bt_cmd_fight, :bt_cmd_bag, :bt_cmd_pokemon, :bt_cmd_run],
+                  1 => [:bt_cmd_fight, :bt_cmd_bag, :bt_cmd_pokemon, :pc_cancel],
+                  2 => [:bt_cmd_fight, :bt_cmd_bag, :bt_cmd_pokemon, :bt_cmd_call],
+                  3 => [:bt_cmd_ball, :bt_cmd_bait, :bt_cmd_rock, :bt_cmd_run],
+                  4 => [:bt_cmd_fight, :bt_cmd_ball, :bt_cmd_pokemon, :bt_cmd_run] }
     # v22's command menu is symbol-based and reorderable, so the focused option is read from the symbol
     # (menu.command) rather than by position.
     CMD_SYMS = { :fight => :bt_cmd_fight, :fight2 => :bt_cmd_fight, :bag => :bt_cmd_bag,
                  :pokemon => :bt_cmd_pokemon, :run => :bt_cmd_run, :call => :bt_cmd_call,
-                 :cancel => :pc_cancel, :shift => :bt_shift }
+                 :cancel => :pc_cancel, :shift => :bt_shift,
+                 :throw_ball => :bt_cmd_ball, :throw_ball_contest => :bt_cmd_ball,
+                 :throw_bait => :bt_cmd_bait, :throw_rock => :bt_cmd_rock }
 
     # Reads the focused option of a battle menu, dispatching on its kind; a no-op for kinds not
     # special-cased. param interrupt whether this read may cut current speech (true for navigation; false
@@ -40,16 +49,17 @@ module PokeAccess
     # The focused command name (Luchar/Mochila/Pokemon...). Prefer the menu's own button texts (@texts),
     # which the engine and battle plugins fill via setTexts -- this reads the real labels shown, including
     # extra buttons a kit like DBK adds (Dynamax/Tera/Z-Move). Falls back to the v22 command symbol
-    # (menu.command), then to the v19-v21 fixed positions with a mode-dependent fourth button.
+    # (menu.command), then to the v19-v21 positional labels chosen by the menu mode (so Safari and the Bug
+    # Contest read Ball/Bait/Rock and Fight/Ball/Pokemon rather than the regular-battle defaults).
     def self.command_label(menu)
       idx = (menu.index rescue 0)
-      texts = (menu.instance_variable_get(:@texts) rescue nil)
+      texts = PokeAccess.ivar(menu, :@texts)
       return PokeAccess.clean(texts[idx]) if texts.is_a?(Array) && idx && texts[idx] && !texts[idx].to_s.empty?
       sym = (menu.command rescue nil)
       return PokeAccess::I18n.t(CMD_SYMS[sym] || sym.to_s) if sym.is_a?(Symbol)
-      return PokeAccess::I18n.t(CMD_LABELS[idx]) if idx && idx < 3
       mode = (menu.mode rescue 0)
-      PokeAccess::I18n.t(CMD3[mode] || :bt_cmd_run)
+      labels = CMD_MODES[mode] || CMD_MODES[0]
+      PokeAccess::I18n.t((idx && labels[idx]) || :bt_cmd_run)
     end
 
     # The move object under the fight cursor.
@@ -65,7 +75,7 @@ module PokeAccess
     # silence -- so when @texts[idx] is empty, name the battler at that index directly (pbThis, or a
     # positional fallback) so every target is announced.
     def self.target_label(menu)
-      texts = (menu.instance_variable_get(:@texts) rescue nil)
+      texts = PokeAccess.ivar(menu, :@texts)
       idx = (menu.index rescue 0)
       t = (texts && texts[idx] && !texts[idx].to_s.empty?) ? PokeAccess.clean(texts[idx]) : nil
       return t if t
@@ -109,12 +119,7 @@ module PokeAccess
       return nil unless battler && amt && amt.to_i > 0
       foe = (battler.opposes? rescue false)
       verb = PokeAccess::I18n.t(lost ? :bt_lose : :bt_gain)
-      rest = if foe
-               tot = (battler.totalhp rescue 0).to_i
-               PokeAccess::I18n.t(:bt_hp_pct, :n => (tot > 0 ? battler.hp.to_i * 100 / tot : 0))
-             else
-               PokeAccess::I18n.t(:bt_hp_exact, :hp => battler.hp, :tot => battler.totalhp)
-             end
+      rest = PokeAccess::Battle.hp_phrase(battler.hp, battler.totalhp, foe)
       PokeAccess::I18n.t(:bt_hp_change, :name => battler.name, :verb => verb, :n => amt.to_i, :rest => rest)
     rescue StandardError
       nil

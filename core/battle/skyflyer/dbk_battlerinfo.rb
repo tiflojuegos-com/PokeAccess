@@ -50,9 +50,9 @@ end
 if PokeAccess::Engine.has?("Battle::Scene#pbUpdateBattlerInfo")
   PokeAccess::Hooks.after_hook("Battle::Scene", :pbUpdateBattlerInfo) do |scene, _ret, args|
     battler = args[0]; effects = args[1]; idx_effect = args[2] || 0
-    if (scene.instance_variable_get(:@enhancedUIToggle) rescue nil) == :battler && battler
+    if PokeAccess.ivar(scene, :@enhancedUIToggle) == :battler && battler
       bidx = (battler.index rescue nil)
-      prev = (scene.instance_variable_get(:@access_binfo) rescue nil)
+      prev = PokeAccess.ivar(scene, :@access_binfo)
       key = [bidx, idx_effect]
       if key != prev
         scene.instance_variable_set(:@access_binfo, key)

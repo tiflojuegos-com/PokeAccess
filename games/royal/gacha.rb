@@ -9,8 +9,8 @@ end
 
 PokeAccess::Game.define("royal") do
   after("GachaScene", :refresh) do |scn, _ret, _args|
-    sel  = (scn.instance_variable_get(:@sel) rescue nil)
-    bsel = (scn.instance_variable_get(:@banner_sel) rescue nil)
+    sel  = PokeAccess.ivar(scn, :@sel)
+    bsel = PokeAccess.ivar(scn, :@banner_sel)
     last = (scn.instance_variable_get(:@access_gacha) rescue nil)
     if sel && [sel, bsel] != last
       banner_changed = last.nil? || last[1] != bsel
@@ -22,7 +22,7 @@ PokeAccess::Game.define("royal") do
       end
       btn = PokeAccess::GachaRoyal::BUTTONS[sel]
       parts.push(btn) if btn
-      PokeAccess.speak(PokeAccess.clean(parts.join(". ")), true) unless parts.empty?
+      PokeAccess.speak_clean(parts.join(". "), true) unless parts.empty?
     end
   end
 end

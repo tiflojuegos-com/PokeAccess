@@ -140,10 +140,10 @@ module PokeAccess
     # Set Move Route on the player); the player feels it as walking. The destination is the event tile
     # plus the move route's net displacement.
     def self.slide_info(ev)
-      trig = (ev.instance_variable_get(:@trigger) rescue nil)
+      trig = PokeAccess.ivar(ev, :@trigger)
       return nil unless trig == 1 || trig == 2
       return nil unless ev.character_name.to_s.empty?
-      list = (ev.instance_variable_get(:@list) rescue nil)
+      list = PokeAccess.ivar(ev, :@list)
       return nil unless list.is_a?(Array)
       facing = nil; mr = nil
       list.each do |c|
@@ -251,6 +251,11 @@ module PokeAccess
       false
     end
 
+    # The arrival test every search shares: a route succeeds once it stands ON the target or ORTHOGONALLY
+    # ADJACENT to it, since the typical target (an NPC, sign or item) occupies a tile the player cannot enter.
+    # A*, JPS and HPA* all end on this same criterion so none demands entering an unwalkable goal tile.
+    def self.target_reached?(x, y, tx, ty); (x - tx).abs + (y - ty).abs <= 1; end
+
     # Orders two frontier nodes [f, turns, ...] by priority f, then by fewer turns.
     def self.heap_less(a, b); a[0] < b[0] || (a[0] == b[0] && a[1] < b[1]); end
 
@@ -288,11 +293,19 @@ module PokeAccess
     end
 
     # Resolves a step from (cx,cy) in a direction to the neighbour the search may enter, or nil when
-    # blocked: a normal passable step, else (edge_relax) a passable border tile, else (allow_ledge) the
-    # ledge landing. Mirrors the game's passability so it never routes through walls.
+    # blocked. A ledge tile is never a standable node: crossing it is only ever the two-tile hop (the
+    # landing), gated by allow_ledge, so it is caught before the passability test -- the real engines
+    # (v21/v22 and the gen-6 games) make the ledge PASSABLE from the high side and decide the jump inside
+    # the "can move" branch, so a plain passability check would otherwise walk into the ledge as a dead end.
+    # Then a normal passable step (ice tiles ride their slide), else (edge_relax) a passable border tile,
+    # else the ledge hop for any engine whose ledge reads impassable (the older model). Both ledge paths go
+    # through ledge_jump, so both honour ledge_dir_ok? and either state of the ledge_directions setting.
     def self.step_target(cx, cy, dir, allow_ledge, edge_relax)
       dx, dy, d = dir
       nx = cx + dx; ny = cy + dy
+      if (PokeAccess::Terrain.ledge_at?(nx, ny) rescue false)
+        return allow_ledge ? ledge_jump(cx, cy, dx, dy, d) : nil
+      end
       if passable_at?(cx, cy, d)
         return ice_slide(nx, ny, dx, dy, d) if PokeAccess::Terrain.ice_at?(nx, ny)
         return [nx, ny]
@@ -349,7 +362,7 @@ module PokeAccess
         closed[ck] = true
         md = (cx - tx).abs + (cy - ty).abs
         if md < bestd; bestd = md; bestk = ck; end
-        return build_route(came, ck) if md <= 1
+        return build_route(came, ck) if target_reached?(cx, cy, tx, ty)
         DIRS.each do |dir|
           d = dir[2]
           nbr = step_target(cx, cy, dir, allow_ledge, edge_relax)
@@ -395,7 +408,7 @@ module PokeAccess
         closed[ck] = true
         md = (cx - tx).abs + (cy - ty).abs
         if md < bestd; bestd = md; bestk = ck; end
-        return jps_route(came, ck) if md <= 1
+        return jps_route(came, ck) if target_reached?(cx, cy, tx, ty)
         DIRS.each do |dir|
           dx = dir[0]; dy = dir[1]; d = dir[2]
           jp = jps_jump(cx, cy, dx, dy, d)
@@ -433,7 +446,7 @@ module PokeAccess
         if (PokeAccess::Terrain.ice_at?(nx, ny) rescue false) || slide_index[pkey(nx, ny)]
           @jps_fallback = true; return nil
         end
-        return [nx, ny] if (nx - @jps_tx).abs + (ny - @jps_ty).abs <= 1
+        return [nx, ny] if target_reached?(nx, ny, @jps_tx, @jps_ty)
         perps = (dx != 0) ? [8, 2] : [4, 6]
         perps.each do |p|
           return [nx, ny] if !passable_at?(x, y, p) && passable_at?(nx, ny, p)
@@ -581,17 +594,40 @@ module PokeAccess
        [[(ay / c) * c + c - 1, (by / c) * c + c - 1].max, h - 1].min]
     end
 
-    # Hierarchical search: connect start and goal to their clusters' portals, A* over the abstract graph,
-    # then refine each abstract hop back into real tile steps with a live local A*. Because every hop is
-    # re-solved against current passability, a stale cached graph can only cause :fallback, never a wrong
-    # route. Returns the route, nil (out of reach), or :fallback (use plain A*).
+    # The tiles at which an HPA* route may ARRIVE: the target itself plus its orthogonal neighbours, kept
+    # only when a tile is standable (some neighbour can step INTO it, the same passable_at? the search uses).
+    # This is the graph-side form of target_reached?: a solid target (NPC/sign/item) drops out and its
+    # walkable neighbours remain, so the hierarchy routes adjacent instead of demanding the unenterable tile.
+    def self.hpa_arrivals(tx, ty)
+      cells = [[tx, ty]]
+      DIRS.each { |dx, dy, _d| cells << [tx + dx, ty + dy] }
+      cells.select do |cx, cy|
+        next false unless ($game_map.valid?(cx, cy) rescue false)
+        DIRS.any? { |dx, dy, d| passable_at?(cx - dx, cy - dy, d) }
+      end
+    end
+
+    # The abstract search's synthetic goal sink: a sentinel key no real tile can pack to (packed tiles are
+    # non-negative), linked at zero cost from every arrival tile so A* selects the cheapest one to reach.
+    HPA_SINK = -1
+
+    # Hierarchical search: connect start and every arrival tile (target or a walkable neighbour) to their
+    # clusters' portals, A* over the abstract graph to a synthetic sink linked from each arrival, then refine
+    # each real abstract hop back into tile steps with a live local A*. Because every hop is re-solved against
+    # current passability, a stale cached graph can only cause :fallback, never a wrong route. Returns the
+    # route, nil (out of reach), :fallback (use plain A*), or [] (already adjacent). Neighbour lists are merged
+    # with dup.concat, never Array#+: Pokemon Z's MTS redefines + as an in-place array mutator that would leak
+    # the temporary edges into the cached graph.
     def self.hpa_search(tx, ty)
       px = $game_player.x; py = $game_player.y
       return nil if (px - tx).abs + (py - ty).abs > reach
+      return [] if target_reached?(px, py, tx, ty)
       gr = hpa_graph
       return :fallback unless gr
       c = gr[:c]; w = gr[:w]; h = gr[:h]; adj = gr[:adj]; byc = gr[:byc]
-      start = pkey(px, py); goal = pkey(tx, ty)
+      start = pkey(px, py)
+      arrivals = hpa_arrivals(tx, ty)
+      return :fallback if arrivals.empty?
       temp = Hash.new { |hh, k| hh[k] = [] }
       connect = lambda do |sx, sy, sk|
         box = [(sx / c) * c, (sy / c) * c, [(sx / c) * c + c - 1, w - 1].min, [(sy / c) * c + c - 1, h - 1].min]
@@ -600,11 +636,16 @@ module PokeAccess
           (temp[sk] << [nk, r[1]]; temp[nk] << [sk, r[1]]) if r
         end
       end
-      connect.call(px, py, start); connect.call(tx, ty, goal)
-      if (px / c) == (tx / c) && (py / c) == (ty / c)
-        box = [(px / c) * c, (py / c) * c, [(px / c) * c + c - 1, w - 1].min, [(py / c) * c + c - 1, h - 1].min]
-        r = hpa_low(px, py, tx, ty, c * c * 2, box[0], box[1], box[2], box[3])
-        temp[start] << [goal, r[1]] if r
+      connect.call(px, py, start)
+      arrivals.each do |ax, ay|
+        ak = pkey(ax, ay)
+        connect.call(ax, ay, ak)
+        temp[ak] << [HPA_SINK, 0]
+        if (px / c) == (ax / c) && (py / c) == (ay / c)
+          box = [(px / c) * c, (py / c) * c, [(px / c) * c + c - 1, w - 1].min, [(py / c) * c + c - 1, h - 1].min]
+          r = hpa_low(px, py, ax, ay, c * c * 2, box[0], box[1], box[2], box[3])
+          temp[start] << [ak, r[1]] if r
+        end
       end
       openh = []; gg = { start => 0 }; cf = {}; cl = {}; it = 0
       deadline = search_deadline
@@ -616,18 +657,20 @@ module PokeAccess
         n = heap_pop(openh)[2]
         next if cl[n]
         cl[n] = true
-        if n == goal; found = true; break; end
-        (adj[n] + temp[n]).each do |e|
+        if n == HPA_SINK; found = true; break; end
+        adj[n].dup.concat(temp[n]).each do |e|
           m = e[0]; ng = gg[n] + e[1]
           if gg[m].nil? || ng < gg[m]
             gg[m] = ng; cf[m] = n
-            heap_push(openh, [ng + (m / PKEY_STRIDE - tx).abs + (m % PKEY_STRIDE - ty).abs, 0, m])
+            hh = (m == HPA_SINK) ? 0 : (m / PKEY_STRIDE - tx).abs + (m % PKEY_STRIDE - ty).abs
+            heap_push(openh, [ng + hh, 0, m])
           end
         end
       end
       return :fallback unless found
-      seq = []; k = goal
+      seq = []; k = cf[HPA_SINK]
       while k; seq.unshift(k); k = cf[k]; end
+      return [] if seq.length <= 1
       route = []; i = 0
       while i < seq.length - 1
         a = seq[i]; b = seq[i + 1]

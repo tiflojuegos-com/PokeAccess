@@ -68,7 +68,7 @@ module PokeAccess
       lists = []
       pages = (ev.instance_variable_get(:@event).pages rescue nil)
       (pages || []).each { |pg| l = (pg.list rescue nil); lists.push(l) if l.is_a?(Array) }
-      live = (ev.instance_variable_get(:@list) rescue nil)
+      live = PokeAccess.ivar(ev, :@list)
       lists.push(live) if live.is_a?(Array)
       lists
     end
@@ -80,7 +80,7 @@ module PokeAccess
     # active page differs). Falls back to all pages if the active list is unavailable.
     def self.transfer_command_lists(ev)
       if (PokeAccess::Config.transfer_active_page_only rescue true)
-        live = (ev.instance_variable_get(:@list) rescue nil)
+        live = PokeAccess.ivar(ev, :@list)
         return [live] if live.is_a?(Array)
       end
       event_command_lists(ev)
@@ -171,7 +171,7 @@ module PokeAccess
     # its name says exit; touch-triggered warp tiles (sprite or not) stay exits.
     def self.transfer_event?(ev)
       return false if sign_event?(ev)
-      trig = (ev.instance_variable_get(:@trigger) rescue 0)
+      trig = PokeAccess.ivar_i(ev, :@trigger)
       return false if trig == 3 || trig == 4
       name = ev.name.to_s
       char = ev.character_name.to_s
@@ -279,7 +279,7 @@ module PokeAccess
     # switches), comparing its pattern to the base page's, so it reflects the real in-game state.
     def self.lever_state_suffix(ev)
       pages = (ev.instance_variable_get(:@event).pages rescue nil)
-      active = (ev.instance_variable_get(:@page) rescue nil)
+      active = PokeAccess.ivar(ev, :@page)
       return "" unless pages.is_a?(Array) && active
       base_pat = (pages[0].graphic.pattern rescue nil)
       cur_pat = (active.graphic.pattern rescue nil)
@@ -410,7 +410,7 @@ module PokeAccess
     # The display name of the pickup item an event gives (a ground poke ball or "store item" cup), parsed
     # from its script, or nil -- so generic item events announce what they contain instead of "objeto".
     def self.item_name(ev)
-      list = (ev.instance_variable_get(:@list) rescue nil)
+      list = PokeAccess.ivar(ev, :@list)
       return nil unless list.is_a?(Array)
       list.each do |c|
         code = (c.code rescue 0)
@@ -483,14 +483,16 @@ module PokeAccess
     # Event name/sprite patterns that mark a door/exit (matched on the event's name and charset).
     EXIT_NAME_RE = /door|puerta|salida|exit/i
     # Action-button command codes that mean an event does something: text/choices, script, or item/money.
-    EXAMINE_CODES = TEXT_CODES + SCRIPT_CODES + GOODS_CODES
+    # Built on a duped array with concat, never `+`: Pokemon Z's MTS library redefines Array#+ as an
+    # in-place mutator, so the literal `+` would corrupt TEXT_CODES and alias this constant to it.
+    EXAMINE_CODES = TEXT_CODES.dup.concat(SCRIPT_CODES).concat(GOODS_CODES)
 
     # True if the event is examined with the action button (trigger 0) and then does something: a sign
     # (show text/choices) or an invisible interactable whose action is a script or item/money change
     # (the rare-candy cups, hidden items). Pure setup triggers (only switches/variables) are skipped.
     def self.examinable?(ev)
-      return false unless (ev.instance_variable_get(:@trigger) rescue nil) == 0
-      list = (ev.instance_variable_get(:@list) rescue nil)
+      return false unless PokeAccess.ivar(ev, :@trigger) == 0
+      list = PokeAccess.ivar(ev, :@list)
       return false unless list.is_a?(Array)
       list.any? { |c| EXAMINE_CODES.include?((c.code rescue 0)) }
     end
@@ -500,9 +502,9 @@ module PokeAccess
     # and graphic-only events with no response are not interactable.
     def self.interactable?(ev)
       return true if transfer_event?(ev) || examinable?(ev)
-      trig = (ev.instance_variable_get(:@trigger) rescue 0)
+      trig = PokeAccess.ivar_i(ev, :@trigger)
       return false unless trig == 1 || trig == 2
-      list = (ev.instance_variable_get(:@list) rescue nil)
+      list = PokeAccess.ivar(ev, :@list)
       list.is_a?(Array) && list.any? { |c| EXAMINE_CODES.include?((c.code rescue 0)) }
     rescue StandardError
       true

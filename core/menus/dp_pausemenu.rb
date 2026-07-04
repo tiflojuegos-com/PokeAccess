@@ -11,8 +11,8 @@ module PokeAccess
     # player-name entry (the DP trainer-card convention) as "Trainer card" instead of the bare name.
     def self.read(menu, opts = {})
       PokeAccess::Info.set_info(:trainer, nil) if opts[:trainer_info]
-      list = (menu.instance_variable_get(:@options) rescue nil)
-      idx  = (menu.instance_variable_get(:@option) rescue nil)
+      list = PokeAccess.ivar(menu, :@options)
+      idx  = PokeAccess.ivar(menu, :@option)
       return unless list.is_a?(Array) && idx && list[idx]
       PokeAccess::Cursor.announce(menu, :dpmenu, idx) do
         label = list[idx][0].to_s

@@ -48,7 +48,7 @@ module PokeAccess
       held    = (screen.pbHeldPokemon rescue nil)
       box     = (storage.currentBox rescue -9)
       key     = [box, selection, (held ? held.object_id : nil), !party.nil?]
-      return if key == (scene.instance_variable_get(:@access_pc_key) rescue nil)
+      return if key == PokeAccess.ivar(scene, :@access_pc_key)
       scene.instance_variable_set(:@access_pc_key, key)
       case selection
       when -1 then PokeAccess.speak(PokeAccess::I18n.t(:pc_box, :name => (storage[box].name rescue '')), true)

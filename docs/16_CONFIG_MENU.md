@@ -60,7 +60,7 @@ accesible. Contiene:
 
 - **Diagnósticos por sección al portapapeles**: audio 3D / eventos y localizador / rendimiento / mapa y
   navegación / escena y runtime. Cada uno copia solo su sección (vía `Clipboard.set_text`) para pegarla
-  donde haga falta sin volcar todo. Un **Diagnóstico completo** escribe a `accessibility/diag.txt` (igual
+  donde haga falta sin volcar todo. Un **Diagnóstico completo** escribe a `accessibility/data/diag.txt` (igual
   que Ctrl+Alt+F9, que se mantiene como atajo).
 - **Ajustes avanzados** del grupo `:debug` del SCHEMA: `transfer_active_page_only` (anunciar una baldosa
   como salida solo si su página activa transfiere) y `route_auto` + `route_budget_ms` (corte del busca-rutas

@@ -45,14 +45,16 @@ class TestRpgEvent
 end
 
 # A Game_Event-like wrapper: exposes @event (raw, with pages), @page (active page) and a direct
-# character_name, which is what the locator's predicates read.
+# character_name, which is what the locator's predicates read. A test may set @blocking to make the tile it
+# stands on impassable, mirroring a solid event in the real engine.
 class TestGameEvent
-  attr_accessor :id, :name, :x, :y, :character_name, :direction
+  attr_accessor :id, :name, :x, :y, :character_name, :direction, :blocking
   def initialize(opts = {})
     @id = opts.fetch(:id, 1)
     @name = opts.fetch(:name, "EV#{@id}")
     @x = opts.fetch(:x, 5); @y = opts.fetch(:y, 5)
     @direction = 2
+    @blocking = false
     pages = opts.fetch(:pages, [TestPage.new])
     @event = TestRpgEvent.new(pages)
     @active = opts.fetch(:active_page, pages[0])

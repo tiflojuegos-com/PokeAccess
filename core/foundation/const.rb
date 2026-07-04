@@ -20,4 +20,35 @@ module PokeAccess
   def self.const?(name)
     !const_at(name).nil?
   end
+
+  # Reads an instance variable off any object, returning fallback when it is unset or the read raises. The mod
+  # introspects game-engine objects by ivar constantly (the engine exposes no accessors), and every such read
+  # must be defensive because the ivar's presence varies across game versions. Centralises the (obj rescue
+  # fallback) idiom that was open-coded at ~200 sites. Lives in foundation so every layer can use it. 1.8.7-safe.
+  # @param sym the ivar symbol, e.g. :@index
+  # @param fallback the value when the ivar is absent or the read raises (default nil)
+  def self.ivar(obj, sym, fallback = nil)
+    obj.instance_variable_get(sym)
+  rescue StandardError
+    fallback
+  end
+
+  # ivar coerced to an Integer, for the numeric ivars whose open-coded reads fell back to 0.
+  def self.ivar_i(obj, sym, fallback = 0)
+    v = ivar(obj, sym)
+    v.nil? ? fallback : v.to_i
+  rescue StandardError
+    fallback
+  end
+
+  # A named sprite from a scene's @sprites hash, or nil when the hash or the key is absent. Essentials scenes
+  # keep their windows in @sprites["name"], which the mod reads to introspect the focused window; this folds
+  # the doubly-defensive ((ivar || {})["k"] rescue nil) idiom into one call. 1.8.7-safe.
+  # @param key the sprite key, e.g. "commandwindow"
+  def self.sprite(scene, key)
+    h = ivar(scene, :@sprites)
+    h.is_a?(Hash) ? h[key] : nil
+  rescue StandardError
+    nil
+  end
 end

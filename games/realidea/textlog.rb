@@ -8,7 +8,7 @@ module PokeAccess
     # bounds, or nil if there is no log. Dedup uses this rather than raw @pos so scrolling against either
     # end (where @pos changes but the focused entry does not) does not re-read the same line.
     def self.focus_index(scene)
-      pos = (scene.instance_variable_get(:@pos) rescue nil)
+      pos = PokeAccess.ivar(scene, :@pos)
       log = ($PokemonGlobal.log rescue nil)
       return nil if pos.nil? || !log.is_a?(Array) || log.empty?
       i = pos - 1

@@ -45,3 +45,31 @@ Suite.define("cursor: nil holder uses the module-wide table") do
   PokeAccess::Cursor.reset(nil, :global_slot)
   truthy "after reset the global key re-reads", PokeAccess::Cursor.changed?(nil, :global_slot, 1)
 end
+
+# pending? is true only until the first key is recorded, so a reader can tell the opening read of a fresh (or
+# reset) cursor from a later move. reset re-arms it. This is what lets the menu readers queue the opening line.
+Suite.define("cursor: pending? marks the first read of a fresh or reset cursor") do
+  holder = Object.new
+  truthy "a fresh slot is pending", PokeAccess::Cursor.pending?(holder, :p)
+  PokeAccess::Cursor.changed?(holder, :p, 1)
+  falsy "after the first key it is no longer pending", PokeAccess::Cursor.pending?(holder, :p)
+  PokeAccess::Cursor.reset(holder, :p)
+  truthy "after reset it is pending again", PokeAccess::Cursor.pending?(holder, :p)
+end
+
+# announce's first_interrupt: the opening read of a fresh cursor is queued (interrupt false) so it does not
+# cut a title/question spoken just before, while every later move interrupts (true). This is the exact
+# Window_DrawableCommand pattern, now owned by Cursor instead of a per-reader "seen" ivar. The plain 4-arg
+# announce is unchanged: with first_interrupt nil, every read uses the same interrupt value.
+Suite.define("cursor: first_interrupt queues the opening read, interrupts later moves") do
+  holder = Object.new
+  PokeAccess::Cursor.announce(holder, :cf, 0, true, false) { "first" }
+  PokeAccess::Cursor.announce(holder, :cf, 1, true, false) { "second" }
+  eq "opening read is queued, the move after interrupts",
+     SpeakCapture.log, [["first", false], ["second", true]]
+
+  SpeakCapture.clear
+  holder2 = Object.new
+  PokeAccess::Cursor.announce(holder2, :cf2, 0, true) { "plain" }
+  eq "without first_interrupt the opening read uses the plain interrupt", SpeakCapture.log, [["plain", true]]
+end

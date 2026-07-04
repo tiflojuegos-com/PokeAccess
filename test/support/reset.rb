@@ -17,12 +17,15 @@ module Reset
     nil
   end
 
-  # Restores a fresh test map (id 1, no events) and player position, so the per-map caches keyed on map_id
-  # (lever/push) never carry events from a previous suite.
+  # Restores a fresh test map (id 1, no events, no ledges, no loaded grid) and player position, so the per-map
+  # caches keyed on map_id (lever/push) never carry events from a previous suite and neither a placed ledge nor
+  # a grid's walls leak forward into a suite that assumes open space.
   def self.reset_map
     return unless $game_map
     $game_map.map_id = 1
     ($game_map.events.clear if $game_map.respond_to?(:events) && $game_map.events.is_a?(Hash))
+    ($game_map.clear_ledges if $game_map.respond_to?(:clear_ledges))
+    ($game_map.clear_grid if $game_map.respond_to?(:clear_grid))
     ($game_player.x = 5; $game_player.y = 5) if $game_player
   end
 end

@@ -15,14 +15,13 @@ module PokeAccess
 
     # The spoken text for the scene's current state, or nil when nothing relevant changed.
     def self.text(scene)
-      pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+      pk = PokeAccess.ivar(scene, :@pokemon)
       return nil unless pk
       info_move = (scene.instance_variable_get(:@infomove) rescue false) ? true : false
       info_hab  = (scene.instance_variable_get(:@infohab) rescue false) ? true : false
       cm = (scene.instance_variable_get(:@chosenmove) rescue 0)
       key = [pk.object_id, info_move, info_hab, info_move ? cm : nil]
-      return nil if key == scene.instance_variable_get(:@access_sumkey)
-      scene.instance_variable_set(:@access_sumkey, key)
+      return nil unless PokeAccess::Cursor.changed?(scene, :sumkey, key)
       return focused_move(pk, cm) if info_move
       return ability_text(pk) if info_hab
       estado(scene, pk)

@@ -8,7 +8,7 @@ module PokeAccess
 
     # Speaks the encounter summary for the just-opened screen, from its @encarray of species ids.
     def self.say(scene)
-      arr = (scene.instance_variable_get(:@encarray) rescue nil)
+      arr = PokeAccess.ivar(scene, :@encarray)
       map = ($game_map.name rescue nil)
       unless arr.is_a?(Array) && !arr.empty?
         PokeAccess.speak(PokeAccess::I18n.t(:aw_dexnav_none, :map => map.to_s), true) if map
@@ -16,7 +16,7 @@ module PokeAccess
       end
       names = arr[0, MAX].map { |sp| species_label(sp) }.reject { |s| s.nil? || s.empty? }
       head = PokeAccess::I18n.t(:aw_dexnav_head, :map => map.to_s, :n => arr.length)
-      PokeAccess.speak(PokeAccess.clean([head, names.join(", ")].join(". ")), true)
+      PokeAccess.speak_clean([head, names.join(", ")].join(". "), true)
     rescue StandardError
       nil
     end

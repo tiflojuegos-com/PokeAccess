@@ -10,6 +10,7 @@ module PokeAccess
     def self.move_description(id); pbGetMessage(MessageTypes::MoveDescriptions, id); end
     def self.type_name(id);        PBTypes.getName(id); end
     def self.item_name(id);        PBItems.getName(id); end
+    def self.item_name_plural(id);  PBItems.getNamePlural(id); end
     def self.item_description(id); pbGetMessage(MessageTypes::ItemDescriptions, id); end
     def self.species_name(id);     PBSpecies.getName(id); end
     def self.ability_name(id);     PBAbilities.getName(id); end

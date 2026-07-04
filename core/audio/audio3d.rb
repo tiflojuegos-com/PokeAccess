@@ -14,7 +14,8 @@ module PokeAccess
     # Wall-side symbol => its RPG Maker direction code, for raycasting toward that side.
     SIDE_DIR = { :w => 4, :e => 6, :n => 8, :s => 2 }
     # How many nearest emitters of each type to keep (so a close one does not mask the rest), and the
-    # minimum seconds between any two discrete pings (so two nearby emitters never sound at once).
+    # window (seconds) after a ping during which emitters within alt_dist of it stay quiet; farther
+    # ones may still ping inside the window (HRTF panning already tells them apart).
     NEAR_MAX = 3
     PING_GAP = 0.25
     # Moving obstacles (e.g. ship sharpedos) move while you stand still, so their tiles go stale between
@@ -427,9 +428,11 @@ module PokeAccess
       @near = { :water => (w && ((w.x - px).abs + (w.y - py).abs) <= r) ? [w.x, w.y] : nil }
     end
 
-    # Fires at most ONE discrete emitter per PING_GAP window so two pings never overlap. Among the types
-    # whose own frequency timer is due, it fires the MOST OVERDUE one (fair scheduling, so a high-frequency
-    # type cannot monopolise every slot); within a type it round-robins its nearest few so they alternate.
+    # Fires at most one discrete emitter per call. Within PING_GAP of the last ping, only candidates
+    # within alt_dist of that ping's position are held back (a farther one still fires; HRTF panning
+    # already tells them apart). Among the types whose own frequency timer is due, it fires the MOST
+    # OVERDUE one (fair scheduling, so a high-frequency type cannot monopolise every slot); within a
+    # type it round-robins its nearest few so they alternate.
     def self.ping_types
       now = PokeAccess.clock
       due = []
@@ -528,8 +531,10 @@ module PokeAccess
   end
 end
 
-# Per-frame driver; hooks Game_Player#update so the whole feature lives in this one file.
-PokeAccess::Hooks.after_hook("Game_Player", :update) do |_p, _r, _a|
+# Per-frame driver; hooks Game_Player#update so the whole feature lives in this one file. frame_hook (not
+# after_hook) because gen-6 runs a whole wild battle inside Game_Player#update: guarding it would pin the
+# reentrancy stack for the entire fight and mute every battle reader.
+PokeAccess::Hooks.frame_hook("Game_Player", :update) do |_p, _a|
   PokeAccess::Perf.measure(:audio3d) { PokeAccess::Audio3D.tick }
 end
 

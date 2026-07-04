@@ -9,9 +9,10 @@ y se traduzcan sin romper nada.
 
 ---
 
-## 1. Hablar: `speak` y `say_dialogue`
+## 1. Hablar: `speak`, `speak_clean` y `say_dialogue`
 
-Hay dos puntos de entrada. Casi siempre usas el primero.
+Hay tres puntos de entrada. Para etiquetas del mod ya limpias usas `speak`; para texto que viene del
+juego usas `speak_clean`; para diálogo de `pbMessage` usas `say_dialogue`.
 
 ### `PokeAccess.speak(text, interrupt = true)`
 
@@ -30,6 +31,18 @@ PokeAccess.speak(linea_de_combate, false)         # mensaje de batalla (no corta
 
 `speak` normaliza espacios, ignora texto vacío, y si algo falla escribe un marcador en
 `accessibility/data/hook_loaded.txt` en vez de petar (nunca tumba el frame).
+
+### `PokeAccess.speak_clean(text, interrupt = true)`
+
+Atajo para el caso más habitual: **texto que viene del juego**. Es literalmente `speak(clean(text), interrupt)` —
+pasa `text` por `clean` (§2) para quitarle los códigos de control de RPG Maker (`\PN`, `\v[n]`, `\c[n]`...) y
+luego lo habla. Es la forma canónica de leer nombres de objeto, líneas de combate, etiquetas de menú del motor,
+etc. Reserva `speak` a secas para strings que ya tienes limpios (una clave i18n ya resuelta).
+
+```ruby
+PokeAccess.speak_clean(cmds[v], !opening)   # opción de combate que da el motor (limpia + habla)
+PokeAccess.speak(PokeAccess::I18n.t(:qu_none), true)  # string del mod ya limpio: speak directo
+```
 
 ### `PokeAccess.say_dialogue(message)`
 
@@ -51,8 +64,10 @@ Los strings de Essentials llevan códigos de control (`\PN` = nombre del jugador
 limpio**: pasa por `clean` cualquier cosa que venga del juego antes de `speak`.
 
 ```ruby
-PokeAccess.speak(PokeAccess.clean(raw_label), true)
+PokeAccess.speak(PokeAccess.clean(raw_label), true)  # equivalente a speak_clean(raw_label, true)
 ```
+
+En la práctica casi nunca escribes `speak(clean(...))` a mano: usa `speak_clean` (§1), que hace exactamente eso.
 
 `clean` sustituye `\PN`/`\v[n]`, elimina los `\X`/`\X[..]`, las etiquetas `<...>`, y los bytes de control
 `\x00-\x1f` (si no se quitan, la línea "pausada" difiere de la normal y se escapa del dedup de
@@ -72,7 +87,7 @@ Interpolación con `%{nombre}`:
 
 ```
 # combate
-bt_hp_change=%{name} %{verb} %{n} PS. %{rest}
+bt_hp_change=%{name} %{verb} %{n} PS, quedan %{rest}
 dbk_ball=%{name}, %{n}
 ```
 
@@ -81,6 +96,15 @@ dbk_ball=%{name}, %{n}
 ```ruby
 PokeAccess::I18n.t(:bt_shift)                                   # sin variables
 PokeAccess::I18n.t(:dbk_ball, :name => item.name, :n => count) # con %{name} y %{n}
+```
+
+Ejemplo real (lector de misiones, `core/field/quests.rb`): todas sus líneas salen de claves `qu_*`
+(`:qu_line`, `:qu_status_done`/`:qu_status_pending`, `:qu_ongoing`, `:qu_completed`, `:qu_none`,
+`:qu_location`, `:qu_detail`), interpolando el dato dinámico del juego (`%{name}`, `%{status}`, `%{loc}`...):
+
+```ruby
+st = PokeAccess::I18n.t((q.completed rescue false) ? :qu_status_done : :qu_status_pending)
+PokeAccess::I18n.t(:qu_line, :name => nm, :status => st)
 ```
 
 `t` busca la clave en el idioma activo, cae al idioma de referencia (`:en`) y, si tampoco está, devuelve
@@ -95,6 +119,11 @@ rápida (debe decir "ninguna huérfana"):
 ```bash
 python -c "es=set(l.split('=',1)[0] for l in open('lang/es.txt',encoding='utf-8') if '=' in l and l[0] not in '#_'); en=set(l.split('=',1)[0] for l in open('lang/en.txt',encoding='utf-8') if '=' in l and l[0] not in '#_'); print('solo es:',es-en,'| solo en:',en-es)"
 ```
+
+El propio motor hace esta comprobación: `PokeAccess::I18n.parity_issues` devuelve `[]` cuando todo está en
+sync, o una lista de problemas (`code:key: missing`, `code:key: duplicated`, o placeholders `%{var}` que
+difieren entre idiomas). La corre el arranque y la suite de tests; el one-liner de arriba es la versión
+manual rápida.
 
 ---
 

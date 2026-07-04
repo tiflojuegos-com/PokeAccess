@@ -25,7 +25,7 @@ module PokeAccess
     def self.poll
       s = @scene
       return unless s
-      win = ((s.instance_variable_get(:@sprites) || {})["itemwindow"] rescue nil)
+      win = PokeAccess.sprite(s, "itemwindow")
       return unless win
       idx = (win.index rescue nil)
       return if idx.nil? || idx < 0

@@ -9,8 +9,8 @@ module PokeAccess
     def self.state(scene)
       detail = (scene.instance_variable_get(:@sprites)["foto"].visible rescue false)
       [detail,
-       (scene.instance_variable_get(:@selec) rescue nil),
-       (scene.instance_variable_get(:@pagina) rescue nil),
+       PokeAccess.ivar(scene, :@selec),
+       PokeAccess.ivar(scene, :@pagina),
        (scene.instance_variable_get(:@girado) rescue false)]
     rescue StandardError
       nil
@@ -21,12 +21,12 @@ module PokeAccess
       sel = (scene.instance_variable_get(:@selec) rescue 0)
       page = (scene.instance_variable_get(:@pagina) rescue 1)
       pages = (scene.instance_variable_get(:@paginas) rescue 1)
-      sprites = (scene.instance_variable_get(:@sprites) rescue nil)
+      sprites = PokeAccess.ivar(scene, :@sprites)
       detail = (sprites && sprites["foto"].visible rescue false)
       card = (sel + 1) + (page - 1) * 6
       if detail
         if (scene.instance_variable_get(:@girado) rescue false)
-          info = (scene.instance_variable_get(:@info1) rescue nil)
+          info = PokeAccess.ivar(scene, :@info1)
           author = (info && info[card - 1]) ? info[card - 1].to_s : ""
           return PokeAccess.clean(author)
         end
@@ -42,8 +42,7 @@ module PokeAccess
     # Reads the focus when it changes.
     def self.announce(scene)
       st = state(scene)
-      return if st.nil? || st == scene.instance_variable_get(:@access_album_state)
-      scene.instance_variable_set(:@access_album_state, st)
+      return unless PokeAccess::Cursor.changed?(scene, :album_state, st)
       t = line(scene)
       PokeAccess.speak(t, true) if t && !t.to_s.empty?
     rescue StandardError

@@ -13,7 +13,7 @@ module PokeAccess
 
     # Reads the focused encounter type when @index changes.
     def self.read_present(s)
-      idx = (s.instance_variable_get(:@index) rescue nil)
+      idx = PokeAccess.ivar(s, :@index)
       return if idx == @last
       @last = idx
       t = text_for(s)

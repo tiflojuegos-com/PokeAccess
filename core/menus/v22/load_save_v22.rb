@@ -24,7 +24,7 @@ end
 # In-game save: the focused slot's summary as the cursor moves.
 if PokeAccess::V22.const_exists?("UI::SaveVisuals")
   PokeAccess::Hooks.after_hook("UI::SaveVisuals", :set_index) do |vis, _ret, _args|
-    sd = (vis.instance_variable_get(:@save_data) rescue nil)
+    sd = PokeAccess.ivar(vis, :@save_data)
     i  = (vis.index rescue nil)
     next unless sd && i
     hash = (sd[i] ? sd[i][1] : nil)
@@ -35,12 +35,12 @@ end
 # Title screen: the focused command (Continue/New Game/Options...), plus the save summary on Continue.
 if PokeAccess::V22.const_exists?("UI::LoadVisuals")
   PokeAccess::Hooks.after_hook("UI::LoadVisuals", :set_index) do |vis, _ret, _args|
-    cmds = (vis.instance_variable_get(:@commands) rescue nil)
-    idx  = (vis.instance_variable_get(:@index) rescue nil)
+    cmds = PokeAccess.ivar(vis, :@commands)
+    idx  = PokeAccess.ivar(vis, :@index)
     next unless cmds && idx
     parts = [cmds[idx]]
     if idx == :continue
-      sd   = (vis.instance_variable_get(:@save_data) rescue nil)
+      sd   = PokeAccess.ivar(vis, :@save_data)
       slot = (vis.slot_index rescue nil)
       hash = (sd && slot && sd[slot] ? sd[slot][1] : nil)
       parts.push(PokeAccess::LoadSaveV22.slot_summary(hash)) if hash
@@ -52,7 +52,7 @@ if PokeAccess::V22.const_exists?("UI::LoadVisuals")
   # On Continue with several saves, LEFT/RIGHT cycle the slot via set_slot_index (not set_index), so the
   # chosen save would otherwise stay silent on a destructive pick. Announce the slot number and its summary.
   PokeAccess::Hooks.after_hook("UI::LoadVisuals", :set_slot_index) do |vis, _ret, _args|
-    sd   = (vis.instance_variable_get(:@save_data) rescue nil)
+    sd   = PokeAccess.ivar(vis, :@save_data)
     slot = (vis.slot_index rescue nil)
     next unless sd && slot
     hash = (sd[slot] ? sd[slot][1] : nil)

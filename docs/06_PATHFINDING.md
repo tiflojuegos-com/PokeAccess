@@ -133,10 +133,12 @@ def self.ledge_jump(cx, cy, dx, dy, d)
   return nil unless PokeAccess::Terrain.ledge_at?(nx, ny)   # ledge vive en Terrain
   return nil unless ledge_dir_ok?(nx, ny, d)                # ¿saltable en esa dirección?
 
-  # Landing dos tiles más allá: válido y pisable (passable? real del juego, no un standable_at? propio)
+  # Landing dos tiles más allá: válido y pisable. El código real prueba las cuatro direcciones
+  # (passable? real del juego), no una sola:
   lx = cx + 2 * dx
   ly = cy + 2 * dy
-  return nil unless $game_map.valid?(lx, ly) && $game_player.passable?(lx, ly, 0)
+  return nil unless $game_map.valid?(lx, ly)
+  return nil unless [2, 4, 6, 8].any? { |dd| $game_player.passable?(lx, ly, dd) }
 
   [lx, ly]
 end
@@ -195,27 +197,22 @@ end
 
 **Para mapas muy grandes** (100x100+ tiles):
 
+La idea (esquema conceptual, NO son los nombres reales):
+
 ```ruby
 # En lugar de explorar 10000 tiles:
-# 1. Dividir mapa en clusters (8x8 tiles)
+# 1. Dividir mapa en clusters (HPA_CLUSTER = 10 -> 10x10 tiles)
 # 2. Buscar entre clusters primero (mucho más rápido)
 # 3. Luego detalle local
-
-@hpa = nil  # Gráfico abstracto
-
-def self.hpa_path(start, goal)
-  if @hpa.nil?
-    # Construir gráfico jerárquico
-    @hpa = build_hpa_graph()
-  end
-  
-  # Buscar en gráfico abstracto
-  cluster_path = a_star(start.cluster, goal.cluster, @hpa)
-  
-  # Convertir a tiles
-  # ...
-end
 ```
+
+Los métodos reales viven en `core/nav/pathfinder.rb`:
+
+- `HPA_CLUSTER = 10` — lado del cluster en tiles.
+- `Pathfinder.hpa_graph` — construye (y cachea por `[map, surfing, diving]`) el grafo abstracto de portales.
+- `Pathfinder.hpa_search(tx, ty)` — A* sobre el grafo abstracto; refina cada salto real con un A* local
+  (`hpa_low`). Devuelve la ruta, `nil` (fuera de alcance), `:fallback` (usar A* normal) o `[]` (ya adyacente).
+- `Pathfinder.hpa_low(sx, sy, gx, gy, maxnodes, x0, y0, x1, y1)` — A* de bajo nivel acotado entre dos tiles.
 
 ## Detección de Reachability
 
@@ -268,8 +265,11 @@ def self.invalidate_cache(force = false)
   @last_invalidate = now
   @pcache = {}           # Limpiar caché de passability
   @pcache_state = nil
+  @rs_key = nil          # Invalidar clave del conjunto reachable (se re-floodea)
   @hpa = nil             # Limpiar gráfico HPA*
-  @reachable_set = nil   # Limpiar conjunto reachable
+  @hpa_sig = nil
+  @surf_key = nil        # Invalidar ruta de surf cacheada
+  @surf_route = nil
 end
 
 # Llamado cuando:
@@ -349,13 +349,14 @@ objetivo lejano no machaque el oído. Tres salvaguardas más viven en `guide_tic
 ### Diagnóstico
 
 ```ruby
-# Ctrl+Alt+F9 → accessibility/diag.txt
-pathfinder: reach=128 algo=:astar max_nodes=2500 cache=true
-  last_path_tiles=127
-  hpa_clusters=42
-  reachable_from_player=892
-# Con route_auto activo, max_nodes deja de ser el corte efectivo: la búsqueda para
-# por tiempo (route_budget_ms) y devuelve la mejor ruta encontrada en ese plazo.
+# Ctrl+Alt+F9 → accessibility/data/diag.txt (bloque de Input.diag_pathfinder)
+pathfinder: reach=128 astar=2500 algo=:astar cache=true edge_relax=false
+reachable: 892 tiles, x 12..40, y 5..33
+target_route: to 30,18 manhattan=14 over_reach=false find_path=17steps surf_launch=nil
+  walk_only=ok target_reachable=true
+  route=3 arriba, 2 izquierda
+# Con route_auto activo, el tope por nodos (astar) deja de ser el corte efectivo: la búsqueda
+# para por tiempo (route_budget_ms) y devuelve la mejor ruta encontrada en ese plazo.
 ```
 
 ## Rendimiento Esperado

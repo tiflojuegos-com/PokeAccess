@@ -23,7 +23,7 @@ module PokeAccess
         h = hm[0]; m = hm[1]
         parts.push("Tiempo de juego: " + (h > 0 ? "#{h} horas #{m} minutos" : "#{m} minutos"))
       end
-      PokeAccess.speak(PokeAccess.clean(parts.join(", ")), true)
+      PokeAccess.speak_clean(parts.join(", "), true)
     rescue StandardError
       nil
     end

@@ -5,8 +5,8 @@ module PokeAccess
 
   # The spoken title + body of the focused tip card, or nil.
   def self.tip_card_text(scene)
-    tips = (scene.instance_variable_get(:@tips) rescue nil)
-    idx = (scene.instance_variable_get(:@index) rescue nil)
+    tips = PokeAccess.ivar(scene, :@tips)
+    idx = PokeAccess.ivar(scene, :@index)
     tip = (tips && idx) ? tips[idx] : nil
     return nil unless tip
     info = (::Settings::TIP_CARDS_CONFIGURATION[tip] rescue nil)
@@ -25,8 +25,8 @@ module PokeAccess
 
   # The spoken title of the focused tip-card GROUP (the grouped browser), or nil.
   def self.tip_group_title(scene)
-    groups = (scene.instance_variable_get(:@groups) rescue nil)
-    sec = (scene.instance_variable_get(:@section) rescue nil)
+    groups = PokeAccess.ivar(scene, :@groups)
+    sec = PokeAccess.ivar(scene, :@section)
     return nil unless groups.is_a?(Array) && sec && groups[sec]
     g = (::Settings::TIP_CARDS_GROUPS[groups[sec]] rescue nil)
     t = (g && g[:Title]) ? (_INTL(g[:Title]) rescue g[:Title]).to_s : nil
@@ -46,7 +46,7 @@ end
 # and a page change calls pbDrawTip directly, so hooking pbDrawTip catches both. Prepend the group title
 # when the group changed. (The group-list popup uses a command window, already read by the generic hook.)
 PokeAccess::Hooks.after_hook("TipCardGroups_Scene", :pbDrawTip) do |scene, _r, _a|
-  sec = (scene.instance_variable_get(:@section) rescue nil)
+  sec = PokeAccess.ivar(scene, :@section)
   parts = []
   if sec != scene.instance_variable_get(:@access_tcg_section)
     scene.instance_variable_set(:@access_tcg_section, sec)
@@ -61,13 +61,13 @@ end
 # Tip-card group MENU (TipMenu_Scene): the screen you pick a group from. pbRedrawList redraws the focused
 # group title as bitmap on each cursor move; read it, deduped by index. @elementos are the group keys.
 PokeAccess::Hooks.after_hook("TipMenu_Scene", :pbRedrawList) do |scene, _r, _a|
-  idx = (scene.instance_variable_get(:@index) rescue nil)
-  if idx && idx != (scene.instance_variable_get(:@access_tipmenu_idx) rescue nil)
+  idx = PokeAccess.ivar(scene, :@index)
+  if idx && idx != PokeAccess.ivar(scene, :@access_tipmenu_idx)
     scene.instance_variable_set(:@access_tipmenu_idx, idx)
-    els = (scene.instance_variable_get(:@elementos) rescue nil)
+    els = PokeAccess.ivar(scene, :@elementos)
     el = (els.is_a?(Array) ? els[idx] : nil)
     g = (el ? (::Settings::TIP_CARDS_GROUPS[el] rescue nil) : nil)
     t = (g && g[:Title]) ? (_INTL(g[:Title]) rescue g[:Title]).to_s : nil
-    PokeAccess.speak(PokeAccess.clean(t), true) if t && !t.to_s.empty?
+    PokeAccess.speak_clean(t, true) if t && !t.to_s.empty?
   end
 end

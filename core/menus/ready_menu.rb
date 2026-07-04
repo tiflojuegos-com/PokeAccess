@@ -4,7 +4,7 @@ module PokeAccess
   # it. Reads the focused item name on change. @commands holds [item_id, name] pairs.
   module ReadyMenu
     def self.poll(scene)
-      PokeAccess::Menus.poll_sprite_menu(scene, :@commands, :@access_ready_last) { |entry| (entry[1] rescue nil) }
+      PokeAccess::Menus.poll_sprite_menu(scene, :@commands, :ready_last) { |entry| (entry[1] rescue nil) }
     end
   end
 end

@@ -10,9 +10,8 @@ end
 
 PokeAccess::Game.define("relict") do
   after("PokemonPauseMenu_Scene", :update_button) do |scene, _ret, _args|
-    idx = (scene.instance_variable_get(:@index) rescue nil)
-    if idx && idx >= 0 && idx != (scene.instance_variable_get(:@access_radial) rescue nil)
-      scene.instance_variable_set(:@access_radial, idx)
+    idx = PokeAccess.ivar(scene, :@index)
+    if idx && idx >= 0 && PokeAccess::Cursor.changed?(scene, :radial, idx)
       label = PokeAccess::RelictMenu::RADIAL[idx]
       PokeAccess.speak(label, true) if label && !label.to_s.empty?
     end

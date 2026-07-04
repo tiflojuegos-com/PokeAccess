@@ -6,8 +6,12 @@ Consulta rápida de los métodos principales de PokeEssentialsAccess.
 
 ```ruby
 PokeAccess.speak(text, interrupt = true)
-# Habla el texto con síntesis de voz
+# Habla el texto con síntesis de voz (vía SRAL)
 # interrupt: true = corta voz anterior, false = encola
+
+PokeAccess.speak_clean(text, interrupt = true)
+# Limpia los códigos de control de RPG Maker (\\PN, \\V[n], \\C[n]...) y habla.
+# Atajo para voz de texto que viene del juego; una línea ya limpia usa speak directo.
 
 PokeAccess.clean(text)
 # Limpia etiquetas gráficas de texto (\\c[1] → "")
@@ -25,6 +29,16 @@ PokeAccess.const_at("A::B::C")
 # Resuelve una constante anidada por nombre, 1.8.7-safe (o nil). La usan Hooks/Input/Menus/Engine.has?
 PokeAccess.const?("UI::BagVisuals")
 # true/false si la constante existe (1.8.7-safe)
+
+PokeAccess.ivar(obj, :@index, fallback = nil)
+# Lee un ivar de cualquier objeto de forma defensiva; devuelve fallback si no existe o falla
+# (los objetos del motor no exponen accessors y el ivar varía por versión). 1.8.7-safe.
+
+PokeAccess.ivar_i(obj, :@index, fallback = 0)
+# Igual que ivar pero forzando a Integer (para ivars numéricos)
+
+PokeAccess.sprite(scene, "commandwindow")
+# Un sprite del hash @sprites de una escena, o nil si el hash o la clave faltan. 1.8.7-safe.
 
 PokeAccess.last_spoken
 # Última línea hablada (para el diag hablado Ctrl+Alt+F10), o nil
@@ -63,7 +77,8 @@ PokeAccess::Engine.has?(cap)
 # Gate por capacidad (el canal recomendado): símbolo registrado (:ui_rework, :gamedata,
 # :sky_fork...), nombre de clase "A::B::C" (1.8.7-safe), o "Clase#metodo".
 PokeAccess::Engine.has?(:ui_rework)
-PokeAccess::Engine.has?("Battle::Scene#setIndexAndMode")
+PokeAccess::Engine.has?("Battle::Scene::MenuBase#setIndexAndMode")
+# true en v21 (el rework UI de v22 elimina ese método); lo usa core/battle/v21/battle_v21.rb
 
 PokeAccess::Engine.version
 # Retorna Float: 16.0, 19.0, 21.1, 22.0, etc.
@@ -109,7 +124,11 @@ PokeAccess::World.want(key, val) # devuelve val; si es nil loguea una vez (lecto
 # Primitiva única de dedup para lecturas de cursor/selección (la UI re-selecciona cada frame).
 PokeAccess::Cursor.changed?(holder, slot, key)   # true (y guarda) si la key cambió en ese holder/slot
 PokeAccess::Cursor.on_change(holder, slot, key) { ... }  # corre el bloque solo si cambió
-PokeAccess::Cursor.announce(holder, slot, key) { texto }  # habla el texto (clean) solo si cambió
+PokeAccess::Cursor.announce(holder, slot, key, interrupt = true, first_interrupt = nil) { texto }
+# Habla el texto (clean) solo si cambió. interrupt: la primera lectura de un cursor recién
+# abierto/reseteado usa first_interrupt (si no es nil) para el patrón "encola la lectura de
+# apertura, interrumpe en los movimientos siguientes"; el resto usa interrupt.
+PokeAccess::Cursor.pending?(holder, slot)        # true en la PRIMERA lectura de un cursor fresco/reseteado
 PokeAccess::Cursor.reset(holder, slot)           # fuerza re-lectura aunque la key no cambie (al reabrir)
 # holder = la escena/instancia (estado por instancia), o nil para una tabla global por slot.
 ```
@@ -134,6 +153,7 @@ PokeAccess::Data.move_accuracy(id)          # 100
 PokeAccess::Data.move_description(id)       # "Atacar..."
 PokeAccess::Data.type_name(id)              # "Fire"
 PokeAccess::Data.item_name(id)              # "Potion"
+PokeAccess::Data.item_name_plural(id)       # "Potions"
 PokeAccess::Data.item_description(id)       # "Recupera 20 HP..."
 PokeAccess::Data.item_id(symbol)            # :POTION → 1
 PokeAccess::Data.ability_name(id)           # "Static"
@@ -153,6 +173,27 @@ PokeAccess::Data.active_priority
 
 PokeAccess::Data.errors
 # Array de errores del provider
+```
+
+## PokeAccess::Battle
+
+```ruby
+PokeAccess::Battle.hp_phrase(hp, tot, as_percent)
+# Frase de HP: porcentaje (as_percent true, para un rival o barra de HP oculto) o "hp/total" exacto.
+# Centraliza el branch y la guarda de división por cero sobre total que cada lector abría a mano.
+```
+
+## PokeAccess::MoveInfo
+
+```ruby
+PokeAccess::MoveInfo.by_id_via_data(id)
+# Detalle hablado de un movimiento por id, resuelto vía el adaptador Data por-motor (PBMoveData en
+# gen-6, GameData en moderno), no GameData directo, para que un lector gen-6 obtenga la línea completa.
+# nil si el id no resuelve. Lo usa el relearner gen-6 (ids PBMove enteros).
+
+PokeAccess::MoveInfo.line(name, type_name, power, accuracy, opts = {})
+# Ensambla "nombre. tipo. poder. precisión[. pp][. descripción]" desde partes ya resueltas.
+# Opciones: :pp y :total_pp (ambas para hablar pp), :desc (se añade si no está en blanco).
 ```
 
 ## PokeAccess::Pathfinder
@@ -205,11 +246,26 @@ PokeAccess::Audio3D.wav(name)
 PokeAccess::Hooks.before_hook(class_name, method_name) { |obj, args| ... }
 # Registrar hook ANTES del método
 
-PokeAccess::Hooks.after_hook(class_name, method_name) { |obj, result, args| ... }
-# Registrar hook DESPUÉS del método
+PokeAccess::Hooks.after_hook(class_name, method_name, opts = {}) { |obj, result, args| ... }
+# Registrar hook DESPUÉS del método (recibe su resultado). Por defecto el original corre BAJO la
+# guarda de reentrancia. Opción :hook_container => true -> el original corre SIN guarda: úsalo cuando
+# el método es un CONTENEDOR (loop modal o abre-escena) que DELEGA el anuncio a métodos hookeados que
+# él conduce internamente (p.ej. la fase de comandos de combate que conduce índice=/setIndex).
 
 PokeAccess::Hooks.around_hook(class_name, method_name) { |obj, call_next, args| ... }
-# Envuelve el método con control total: llama call_next para ejecutar el resto de la cadena
+# Envuelve el método con control total: llama call_next para ejecutar el resto de la cadena.
+# call_next usa los argumentos ORIGINALES; para cambiarlos, MUTA el array args in situ antes de llamar.
+
+PokeAccess::Hooks.frame_hook(class_name, method_name) { |obj, args| ... }
+# After-hook para un DRIVER por-frame: un método que el motor llama cada frame y que puede alojar
+# sincrónicamente un loop modal anidado entero (caso clave Game_Player#update: pisar hierba lanza el
+# combate salvaje DESDE DENTRO). Corre el original SIN guarda (alias de :hook_container) y el body
+# después. El body no usa el valor de retorno.
+
+PokeAccess::Hooks.wrap_global(name, tag, timing = :after) { |args, x| ... }
+# Envuelve un método top-level (de Object) que los hooks de clase no alcanzan, p.ej. pbDisplayMail.
+# timing :before -> corre antes, x=nil ; :after -> corre después, x=resultado. No-op si indefinido
+# o ya envuelto. 1.8.7-safe.
 
 PokeAccess::Hooks.wrap_kernel(fn_name, tag, timing = :before) { |args, x| ... }
 # Engancha una función a nivel Kernel (singleton de gen-6) Y la versión top-level de Essentials

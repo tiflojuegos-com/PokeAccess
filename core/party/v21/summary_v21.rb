@@ -8,7 +8,7 @@ module PokeAccess
     def self.speak_page(scene, page)
       t = PokeAccess::SummaryGameData.page_text(scene, page)
       return if t.nil? || t.to_s.empty?
-      return if t == (scene.instance_variable_get(:@access_page_text) rescue nil)
+      return if t == PokeAccess.ivar(scene, :@access_page_text)
       scene.instance_variable_set(:@access_page_text, t)
       PokeAccess.speak(t, false)
     rescue StandardError
@@ -25,12 +25,12 @@ end
 
 # Focused move detail while navigating the moves page (and while choosing one to replace).
 PokeAccess::Hooks.after_hook("PokemonSummary_Scene", :drawSelectedMove) do |scene, _r, args|
-  pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+  pk = PokeAccess.ivar(scene, :@pokemon)
   PokeAccess.speak(PokeAccess::SummaryGameData.move_detail(pk, args[1]), true)
 end
 
 # Choosing which move to forget when learning a new one: list the current four.
 PokeAccess::Hooks.before_hook("PokemonSummary_Scene", :pbChooseMoveToForget) do |scene, _args|
-  pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+  pk = PokeAccess.ivar(scene, :@pokemon)
   PokeAccess.speak(PokeAccess::I18n.t(:sm_choose_forget) + ". " + PokeAccess::SummaryGameData.moves_text(pk).to_s, false)
 end

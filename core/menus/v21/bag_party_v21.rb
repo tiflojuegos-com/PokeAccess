@@ -6,7 +6,7 @@
 if PokeAccess::Engine.has?("PokemonBagPartyPanel")
   PokeAccess::Hooks.after_hook("PokemonBagPartyPanel", :selected=) do |panel, _r, args|
     if args[0]
-      pk = (panel.instance_variable_get(:@pokemon) rescue nil)
+      pk = PokeAccess.ivar(panel, :@pokemon)
       if pk
         PokeAccess::Info.set_info(:pokemon, pk)
         PokeAccess::UIV21.speak_changed(:party, PokeAccess::UIV21.party_member(pk))

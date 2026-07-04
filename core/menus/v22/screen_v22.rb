@@ -24,7 +24,7 @@ module PokeAccess
       PokeAccess::Hooks.after_hook(class_name, method) do |vis, _ret, _args|
         t = (reader.call(vis) rescue nil)
         key = [(vis.index rescue nil), t]
-        unless key == (vis.instance_variable_get(:@access_v22_key) rescue nil)
+        unless key == PokeAccess.ivar(vis, :@access_v22_key)
           vis.instance_variable_set(:@access_v22_key, key)
           PokeAccess.speak(t, true) if t && !t.to_s.empty?
         end

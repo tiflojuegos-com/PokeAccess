@@ -127,11 +127,11 @@ module PokeAccess
     # Each move's full detail is read as you navigate (drawSelectedMove) and the four-move overview on
     # arrival comes from drawPageFour, so this never re-speaks them. No-op without those sprites.
     def self.reorder_poll(scene)
-      sp = (scene.instance_variable_get(:@sprites) rescue nil)
+      sp = PokeAccess.ivar(scene, :@sprites)
       mp = sp && sp["movepresel"]
       ms = sp && sp["movesel"]
       return if mp.nil? || ms.nil?
-      pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+      pk = PokeAccess.ivar(scene, :@pokemon)
       sw = mp.visible ? true : false
       idx = (ms.index rescue nil)
       if sw != @reorder_sw
@@ -202,7 +202,7 @@ end
 # (up/down) without leaving, but only the party slot set the contextual Pokemon, so T kept reading the one
 # you entered with. pbUpdate runs each frame with the live @pokemon, so refresh it here.
 PokeAccess::Hooks.after_hook("PokemonSummaryScene", :pbUpdate) do |scene, _r, _a|
-  pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+  pk = PokeAccess.ivar(scene, :@pokemon)
   PokeAccess::Info.set_info(:pokemon, pk) if pk
   PokeAccess::SummaryGen6.reorder_poll(scene)
 end

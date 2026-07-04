@@ -41,7 +41,7 @@ module PokeAccess
 
     # Builds the stat-stage change suffix for a battler.
     def self.stat_changes(b)
-      stages = (b.instance_variable_get(:@stages) rescue nil)
+      stages = PokeAccess.ivar(b, :@stages)
       parts = []
       if stages.is_a?(Hash)
         stages.each do |sym, v|
@@ -62,15 +62,20 @@ module PokeAccess
       ""
     end
 
+    # An hp phrase, either a percentage (for a foe or a hide-exact-hp bar) or exact "hp/total". Centralises the
+    # branch the battle readers each open-coded, including the divide-by-zero guard on total. param as_percent
+    # read as a percentage rather than exact
+    def self.hp_phrase(hp, tot, as_percent)
+      h = hp.to_i; t = tot.to_i
+      return PokeAccess::I18n.t(:bt_hp_pct, :n => (t > 0 ? h * 100 / t : 0)) if as_percent
+      PokeAccess::I18n.t(:bt_hp_exact, :hp => h, :tot => t)
+    end
+
     # Describes a battler's hp, status and stat changes. param hide_exact reads hp as a percentage
     # (parity with the foe's bar)
     def self.battler_state(b, hide_exact = false)
       return nil unless b
-      hp = if hide_exact
-             PokeAccess::I18n.t(:bt_hp_pct, :n => (b.totalhp > 0 ? b.hp * 100 / b.totalhp : 0))
-           else
-             PokeAccess::I18n.t(:bt_hp_exact, :hp => b.hp, :tot => b.totalhp)
-           end
+      hp = hp_phrase(b.hp, b.totalhp, hide_exact)
       t = PokeAccess::I18n.t(:bt_state, :name => b.name, :level => b.level, :hp => hp)
       sv = (b.status rescue nil)
       if sv.is_a?(Symbol)
@@ -133,6 +138,28 @@ module PokeAccess
 
     @last_target = nil
 
+    # The index of the battler currently choosing a target in the gen-6 pbChooseTarget loop, read from the
+    # fight window whose battler was set to the chooser (cw.battler = @battle.battlers[index]). Used so the
+    # self/ally label is relative to the chooser, not hardcoded to slot 0 (the second player slot, index 2,
+    # is also a valid chooser and would otherwise mislabel itself as ally and its partner as self). nil when
+    # it cannot be read, so the caller keeps the slot-0 assumption as a fallback.
+    def self.target_chooser_index(scene)
+      cw = PokeAccess.sprite(scene, "fightwindow")
+      b = (cw.battler rescue nil)
+      (b.index rescue nil)
+    rescue StandardError
+      nil
+    end
+
+    # The side key for a highlighted battler while choosing a target, relative to the chooser: an odd index
+    # is always the foe's side; among the player's slots, the chooser itself reads "your pokemon" and the
+    # partner "ally". param chooser the choosing battler's index, or nil to assume slot 0
+    def self.target_side_key(index, chooser)
+      return :bt_target_foe if index.odd?
+      return :bt_target_self if index == (chooser.nil? ? 0 : chooser)
+      :bt_target_ally
+    end
+
     # Announces the battler under the target cursor while choosing a move's target in doubles (gen-6
     # pbChooseTarget highlights via pbUpdateSelected). param index the highlighted battler index, or
     # negative to clear (so re-entering selection reads again)
@@ -141,13 +168,13 @@ module PokeAccess
         @last_target = nil
         return
       end
-      battle = (scene.instance_variable_get(:@battle) rescue nil)
+      battle = PokeAccess.ivar(scene, :@battle)
       return unless battle
       return unless (battle.doublebattle rescue false)
       return if index == @last_target
       @last_target = index
       b = (battle.battlers ? battle.battlers[index] : nil) rescue nil
-      side = PokeAccess::I18n.t(index.odd? ? :bt_target_foe : (index == 0 ? :bt_target_self : :bt_target_ally))
+      side = PokeAccess::I18n.t(target_side_key(index, target_chooser_index(scene)))
       name = (b && (b.pokemon rescue nil)) ? b.name : PokeAccess::I18n.t(:bt_empty_slot)
       PokeAccess.speak("#{name}, #{side}", true)
     rescue StandardError
@@ -294,7 +321,7 @@ module PokeAccess
 
     # Appends trick room / gravity and the active terrain (object-terrain on modern, effect flags on gen-6).
     def self.field_terrain(out)
-      field = (@battle_ref.instance_variable_get(:@field) rescue nil)
+      field = PokeAccess.ivar(@battle_ref, :@field)
       return unless field
       { :TrickRoom => :bt_trickroom, :Gravity => :bt_gravity }.each do |k, key|
         c = (field.effects[PBEffects.const_get(k)] rescue 0)
@@ -316,7 +343,7 @@ module PokeAccess
 
     # Appends the per-side effects (screens, hazards, tailwind...) for both sides.
     def self.field_sides(out)
-      sides = (@battle_ref.instance_variable_get(:@sides) rescue nil)
+      sides = PokeAccess.ivar(@battle_ref, :@sides)
       return unless sides
       side_names = [PokeAccess::I18n.t(:bt_side_yours), PokeAccess::I18n.t(:bt_side_foe)]
       [0, 1].each do |si|
@@ -339,11 +366,7 @@ module PokeAccess
       return if diff == 0
       foe = (pkmn.index.odd? rescue false)
       verb = PokeAccess::I18n.t(diff < 0 ? :bt_lose : :bt_gain)
-      rest = if foe
-               PokeAccess::I18n.t(:bt_hp_pct, :n => (pkmn.totalhp > 0 ? pkmn.hp * 100 / pkmn.totalhp : 0))
-             else
-               PokeAccess::I18n.t(:bt_hp_exact, :hp => pkmn.hp, :tot => pkmn.totalhp)
-             end
+      rest = hp_phrase(pkmn.hp, pkmn.totalhp, foe)
       PokeAccess.speak(PokeAccess::I18n.t(:bt_hp_change, :name => pkmn.name, :verb => verb, :n => diff.abs, :rest => rest), false)
     end
 

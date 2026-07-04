@@ -6,11 +6,11 @@ module PokeAccess
   module RoyalLanguage
     def self.read(win)
       idx = (win.index rescue -1)
-      return if idx < 0 || idx == (win.instance_variable_get(:@access_lang) rescue nil)
-      win.instance_variable_set(:@access_lang, idx)
-      cmds = (win.instance_variable_get(:@commands) rescue nil)
+      return if idx < 0
+      return unless PokeAccess::Cursor.changed?(win, :lang, idx)
+      cmds = PokeAccess.ivar(win, :@commands)
       t = (cmds.is_a?(Array) && cmds[idx]) ? cmds[idx].to_s : nil
-      PokeAccess.speak(PokeAccess.clean(t), true) if t && !t.empty?
+      PokeAccess.speak_clean(t, true) if t && !t.empty?
     rescue StandardError
       nil
     end

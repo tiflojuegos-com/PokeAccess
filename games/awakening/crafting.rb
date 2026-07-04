@@ -11,7 +11,7 @@ module PokeAccess
 
     # Reads the focused recipe (result item + amount) from a pbRedrawItem call.
     def self.say(scene, index, volume)
-      stock = (scene.instance_variable_get(:@stock) rescue nil)
+      stock = PokeAccess.ivar(scene, :@stock)
       return unless stock.is_a?(Array) && index && index >= 0 && index < stock.length
       item = (stock[index][0] rescue nil)
       return if item.nil?
@@ -23,7 +23,7 @@ module PokeAccess
       return if name.nil? || name.to_s.empty?
       t = (vol > 1) ? PokeAccess::I18n.t(:aw_craft_n, :n => vol, :name => name) :
                       PokeAccess::I18n.t(:aw_craft, :name => name)
-      PokeAccess.speak(PokeAccess.clean(t), true)
+      PokeAccess.speak_clean(t, true)
     rescue StandardError
       nil
     end

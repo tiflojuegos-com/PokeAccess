@@ -9,7 +9,7 @@ module PokeAccess
     def self.line(vis)
       idx     = (vis.index rescue nil)
       box     = (vis.box rescue nil)
-      storage = (vis.instance_variable_get(:@storage) rescue nil)
+      storage = PokeAccess.ivar(vis, :@storage)
       return nil if idx.nil?
       in_box = box.is_a?(Integer) && box >= 0
       held = ((vis.holding_pokemon? ? vis.pokemon : nil) rescue nil)

@@ -19,7 +19,7 @@ module PokeAccess
       parts.push(PokeAccess::I18n.t(:tr_playtime, :h => hm[0], :m => hm[1])) if hm
       stars = ($game_variables[STARS_VAR] rescue nil)
       parts.push(PokeAccess::I18n.t(:tcard_stars, :n => stars.to_i)) if stars
-      PokeAccess.speak(PokeAccess.clean(parts.join(", ")), true)
+      PokeAccess.speak_clean(parts.join(", "), true)
     rescue StandardError
       nil
     end
@@ -28,8 +28,8 @@ module PokeAccess
     def self.read_badges
       return unless $Trainer
       n = PokeAccess::Util.badge_count($Trainer) || 0
-      PokeAccess.speak(PokeAccess.clean(
-        PokeAccess::I18n.t(:tr_badges, :n => n) + ". " + PokeAccess::I18n.t(:tcard_anthem_keys)), true)
+      PokeAccess.speak_clean(
+        PokeAccess::I18n.t(:tr_badges, :n => n) + ". " + PokeAccess::I18n.t(:tcard_anthem_keys), true)
     rescue StandardError
       nil
     end

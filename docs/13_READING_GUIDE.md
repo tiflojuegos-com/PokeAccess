@@ -13,7 +13,7 @@ Esta guía te ayuda a encontrar exactamente qué leer según tu objetivo.
 1. [Introducción](01_INTRODUCTION.md)          [5 min]
    └─ ¿Qué es PokeAccess?
    
-2. Documentación de Opciones (por hacer)      [10 min]
+2. [Menú de Configuración](16_CONFIG_MENU.md)  [10 min]
    └─ Explicación de cada opción
    
 3. [API Reference](10_API_REFERENCE.md)       [5 min]
@@ -39,8 +39,8 @@ Esta guía te ayuda a encontrar exactamente qué leer según tu objetivo.
 3. [Engine Detection](03_ENGINE_DETECTION.md)     [15 min]
    └─ Entender qué versión de Essentials
    
-4. Game-Specific Layers (por hacer)               [20 min]
-   └─ Cómo crear games/<tuJuego>/
+4. [Extender](14_EXTENDING.md)                    [20 min]
+   └─ Cómo crear games/<tuJuego>/ con Game.define
    
 5. [API Reference](10_API_REFERENCE.md)           [10 min]
    └─ Qué métodos están disponibles
@@ -185,6 +185,23 @@ TOTAL: 9.5 horas
 
 ---
 
+### 🔊 Subsistema: **Voz e i18n**
+
+**Documentos necesarios**:
+```
+[Voz e i18n](15_SPEECH_AND_I18N.md)
+  ├─ Cómo hablar (core/speech/)
+  ├─ Localización (core/foundation/i18n.rb + lang/*.txt)
+  └─ Escribir lectores que se traduzcan
+
+[API Reference](10_API_REFERENCE.md) - PokeAccess.speak, PokeAccess::I18n
+  └─ Métodos
+```
+
+**Tiempo**: 45 minutos
+
+---
+
 ### 🎮 Subsistema: **Sistema de Datos**
 
 **Documentos necesarios**:
@@ -214,8 +231,8 @@ TOTAL: 9.5 horas
 ### 🎯 Tarea: Agregar nueva opción de configuración
 
 **Pasos**:
-1. Lee [Config Schema](#) (por hacer)
-2. Edita `core/foundation/config.rb`
+1. Lee [Menú de Configuración](16_CONFIG_MENU.md) - Cómo se define una opción
+2. Edita `core/foundation/config.rb` (tabla `SCHEMA`)
 3. Lee [Patching & Hooks](04_PATCHING_AND_HOOKS.md) para entender cómo usarla
 4. Lee [API Reference](10_API_REFERENCE.md) - PokeAccess::Config
 
@@ -248,6 +265,17 @@ TOTAL: 9.5 horas
 6. Lee [Loading System](09_LOADING_SYSTEM.md) - Agregar a manifest
 
 **Tiempo**: 2 horas
+
+---
+
+### 🎯 Tarea: Dar voz a una pantalla nueva (sin tocar el core)
+
+**Pasos**:
+1. Lee [Extender](14_EXTENDING.md) - DSL `PokeAccess::Game.define`
+2. Lee [Voz e i18n](15_SPEECH_AND_I18N.md) - Cómo hablar y localizar
+3. Crea o edita `games/<tuJuego>/` con tus lectores
+
+**Tiempo**: 1 hora
 
 ---
 
@@ -401,8 +429,9 @@ Después de leer esta documentación, deberías poder:
 R: No. Depende de tu rol (arriba hay rutas personalizadas)
 
 **P: ¿Está incompleta la documentación?**
-R: Sí, faltan documentos "Game-Specific Layers", "Config Options", etc.
-Se añadirán próximamente.
+R: No. Extender el mod está en [Extender](14_EXTENDING.md), las opciones en
+[Menú de Configuración](16_CONFIG_MENU.md) y la voz/localización en
+[Voz e i18n](15_SPEECH_AND_I18N.md).
 
 **P: ¿En qué orden leo si no sé Ruby?**
 R: 1. Ruby Fundamentals 2. Introducción 3. Lo demás

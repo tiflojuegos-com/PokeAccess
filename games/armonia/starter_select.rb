@@ -5,15 +5,14 @@
 # (pbConfirmMessage) is already spoken by the message reader.
 PokeAccess::Game.define("armonia") do
   after("PokemonStarterSelection", :gettinginput) do |scene, _result, _args|
-    sel = (scene.instance_variable_get(:@select) rescue nil)
-    next if sel.nil? || sel == scene.instance_variable_get(:@access_starter_sel)
-    scene.instance_variable_set(:@access_starter_sel, sel)
-    pkmn = (scene.instance_variable_get(:@pokemon) rescue nil)
+    sel = PokeAccess.ivar(scene, :@select)
+    next unless PokeAccess::Cursor.changed?(scene, :starter_sel, sel)
+    pkmn = PokeAccess.ivar(scene, :@pokemon)
     next unless pkmn
     name = (pkmn.name rescue nil)
     next if !name || name.to_s.empty?
     types = (PokeAccess::Data.pokemon_types(pkmn) rescue [])
     txt = types.empty? ? name.to_s : "#{name}, #{types.join('/')}"
-    PokeAccess.speak(PokeAccess.clean(txt), true)
+    PokeAccess.speak_clean(txt, true)
   end
 end

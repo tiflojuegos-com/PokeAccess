@@ -1,7 +1,7 @@
 {
   "_comment": "Catalogo de perfiles de juego. Fuente unica para el instalador y el actualizador (launcher). key = carpeta en games/. display = nombre hablado. detect = patron (regex, ci) sobre 'carpeta + exe' para autodeteccion; null = no autodetectable (elegir a mano). engine = gen6 (Ruby 1.8.7) o gamedata (Ruby 3.x, GameData). generic = perfil de reserva para cualquier juego mkxp-z compatible.",
   "profiles": [
-    { "key": "pokemon_z",     "display": "Pokemon Z",              "detect": "pokemon ?z|pokemonz|\\bz\\b", "engine": "gen6" },
+    { "key": "pokemon_z",     "display": "Pokemon Z",              "detect": "pokemon ?z\\b",               "engine": "gen6" },
     { "key": "opalo",         "display": "Pokemon Ópalo",          "detect": "opalo|ópalo",                 "engine": "gen6" },
     { "key": "reminiscencia", "display": "Pokemon Reminiscencia",  "detect": "reminisc",                    "engine": "gen6" },
     { "key": "armonia",       "display": "Pokemon Armonia",        "detect": "armon",                       "engine": "gen6" },

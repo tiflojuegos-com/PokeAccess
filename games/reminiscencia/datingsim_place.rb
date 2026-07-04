@@ -17,11 +17,10 @@ module PokeAccess
 
     # Reads the focused place when the horizontal index changes.
     def self.announce(scene)
-      idx = (scene.instance_variable_get(:@index) rescue nil)
-      return if idx.nil? || idx == scene.instance_variable_get(:@access_place_idx)
-      scene.instance_variable_set(:@access_place_idx, idx)
+      idx = PokeAccess.ivar(scene, :@index)
+      return unless PokeAccess::Cursor.changed?(scene, :place_idx, idx)
       t = place_name(idx)
-      PokeAccess.speak(PokeAccess.clean(t), true) if t && !t.to_s.empty?
+      PokeAccess.speak_clean(t, true) if t && !t.to_s.empty?
     rescue StandardError
       nil
     end

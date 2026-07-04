@@ -2,6 +2,12 @@
 
 Bienvenido a la documentación completa de **PokeEssentialsAccess**. Este índice te guiará através de todos los documentos.
 
+## 🚀 Antes de Empezar
+
+### 0. **[Quick Start](00_QUICK_START.md)** - Resumen en 5 minutos
+- Lo esencial del mod condensado
+- Ideal si tienes prisa antes de leer la introducción completa
+
 ## 📚 Documentos Principales
 
 ### 1. **[Introducción](01_INTRODUCTION.md)** - COMIENZA AQUÍ
@@ -82,7 +88,7 @@ Bienvenido a la documentación completa de **PokeEssentialsAccess**. Este índic
 - PokeAccess::Data - Acceso a datos
 - PokeAccess::Pathfinder - Rutas
 - PokeAccess::Audio3D - Audio 3D
-- PokeAccess::Speech - Síntesis de voz
+- PokeAccess.speak - Síntesis de voz
 - PokeAccess::Events - Bus de eventos
 - PokeAccess::Hooks - Sistema de hooks
 - PokeAccess::Tags - Etiquetas de usuario
@@ -92,19 +98,38 @@ Bienvenido a la documentación completa de **PokeEssentialsAccess**. Este índic
 - Gráfico de qué depende de qué
 - Orden de carga
 - Importancia de cada módulo
-- Cómo extend el sistema
+- Cómo se extiende el sistema
+
+## 🧭 Guías y Extensión
+
+### 12. **[Guía de Lectura](13_READING_GUIDE.md)** - Mapa Personalizado
+- Qué leer según tu objetivo concreto
+- Rutas de lectura por meta
+
+### 13. **[Extender el Mod](14_EXTENDING.md)** - Hooks, Lectores, Puzzles y Perfiles
+- Cómo añadir accesibilidad a una pantalla nueva sin tocar el core
+- Añadir lectores, puzzles y perfiles de juego
+
+### 14. **[Voz e i18n](15_SPEECH_AND_I18N.md)** - Cómo Hablar y Localizar
+- Sistema de voz (`core/speech/`)
+- Localización de strings (`lang/*.txt`)
+
+### 15. **[Menú de Configuración](16_CONFIG_MENU.md)** - config_menu
+- El menú hablado que el usuario abre sobre el juego
+- Opciones disponibles y cómo se persisten
 
 ## 🎯 Lectura por Rol
 
 ### Si eres **Usuario de PokeEssentialsAccess**
-1. [Introducción](01_INTRODUCTION.md)
-2. [Configuración](#) (próximo documento)
+1. [Quick Start](00_QUICK_START.md)
+2. [Introducción](01_INTRODUCTION.md)
+3. [Menú de Configuración](16_CONFIG_MENU.md)
 
 ### Si eres **Desarrollador del Juego**
 1. [Introducción](01_INTRODUCTION.md)
 2. [Arquitectura](02_ARCHITECTURE.md) - Entender estructura
 3. [Engine Detection](03_ENGINE_DETECTION.md) - Saber qué versión es
-4. [Game Specific Layers](#) - Cómo personalizar
+4. [Extender el Mod](14_EXTENDING.md) - Cómo personalizar
 
 ### Si eres **Contributor a PokeEssentialsAccess**
 1. Todos los anteriores +
@@ -113,6 +138,8 @@ Bienvenido a la documentación completa de **PokeEssentialsAccess**. Este índic
 4. [API Reference](10_API_REFERENCE.md)
 5. [Dependencies Tree](11_DEPENDENCIES_TREE.md)
 6. [Ruby Fundamentals](08_RUBY_FUNDAMENTALS.md)
+7. [Extender el Mod](14_EXTENDING.md)
+8. [Voz e i18n](15_SPEECH_AND_I18N.md)
 
 ### Si Necesitas Entender **Un Subsistema Específico**
 - **Rutas**: [Pathfinding](06_PATHFINDING.md)
@@ -134,7 +161,12 @@ PokeEssentialsAccess/
 │   ├── nav/                     ← [Pathfinding](06_PATHFINDING.md)
 │   ├── audio/                   ← [Audio3D](07_AUDIO3D.md)
 │   ├── battle/                  ← [Engine Detection](03_ENGINE_DETECTION.md)
-│   └── menus/                   ← [Patching & Hooks](04_PATCHING_AND_HOOKS.md)
+│   ├── menus/                   ← [Patching & Hooks](04_PATCHING_AND_HOOKS.md)
+│   ├── dialogue/                ← [Extender el Mod](14_EXTENDING.md)
+│   ├── field/                   ← [Extender el Mod](14_EXTENDING.md)
+│   ├── party/                   ← [Extender el Mod](14_EXTENDING.md)
+│   ├── puzzles/                 ← [Extender el Mod](14_EXTENDING.md)
+│   └── util/                    ← [Arquitectura](02_ARCHITECTURE.md)
 │
 ├── games/<nombre>/              ← Documentado en: [Arquitectura](02_ARCHITECTURE.md)
 │   ├── constants.rb             ← Define juego
@@ -173,13 +205,13 @@ PokeEssentialsAccess/
 ## 🔍 Cómo Buscar
 
 ### Por Tema
-- **Configuración**: [Config](05_DATA_API.md#configuración)
+- **Configuración**: [Menú de Configuración](16_CONFIG_MENU.md)
 - **Errores**: [Loading System](09_LOADING_SYSTEM.md#recuperación-de-errores)
 - **Rendimiento**: [Pathfinding](06_PATHFINDING.md#rendimiento), [Architecture](02_ARCHITECTURE.md#rendimiento)
 - **Debugging**: [Loading System](09_LOADING_SYSTEM.md#diagnóstico)
 
 ### Por Clase/Módulo
-- `PokeAccess::Config` → [Architecture](02_ARCHITECTURE.md#capa-1-foundation), [Config Schema](#)
+- `PokeAccess::Config` → [Architecture](02_ARCHITECTURE.md#capa-1-foundation), [Menú de Configuración](16_CONFIG_MENU.md)
 - `PokeAccess::Engine` → [Engine Detection](03_ENGINE_DETECTION.md)
 - `PokeAccess::Data` → [Data API](05_DATA_API.md)
 - `PokeAccess::Pathfinder` → [Pathfinding](06_PATHFINDING.md)
@@ -188,20 +220,18 @@ PokeEssentialsAccess/
 
 ## 📝 Glosario Rápido
 
-| Término | Explicación | Doc |
-|---------|------------|-----|
-| **Gen-6** | Essentials v16-v17 (viejo) | [Engine Detection](03_ENGINE_DETECTION.md) |
-| **Era GameData** | Essentials v19+ (nuevo) | [Engine Detection](03_ENGINE_DETECTION.md) |
-| **GameData** | API de datos en Essentials (era GameData) | [Data API](05_DATA_API.md) |
-| **Provider** | Adaptador para diferentes versiones | [Data API](05_DATA_API.md) |
-| **Hook** | Interceptar método sin modificar archivo | [Patching & Hooks](04_PATCHING_AND_HOOKS.md) |
-| **A*** | Algoritmo de búsqueda de ruta | [Pathfinding](06_PATHFINDING.md) |
-| **HRTF** | Audio 3D binaural | [Audio3D](07_AUDIO3D.md) |
-| **Manifest** | Lista ordenada de módulos a cargar | [Loading System](09_LOADING_SYSTEM.md) |
-| **Preload** | Script que se ejecuta ANTES del juego | [Loading System](09_LOADING_SYSTEM.md) |
-| **eval()** | Ejecutar código Ruby como string | [Ruby Fundamentals](08_RUBY_FUNDAMENTALS.md) |
-| **Emitter** | Fuente de sonido 3D | [Audio3D](07_AUDIO3D.md) |
-| **Oclusión** | Sonido muerto al atravesar paredes | [Audio3D](07_AUDIO3D.md) |
+- **Gen-6**: Essentials v16-v17 (viejo). Ver [Engine Detection](03_ENGINE_DETECTION.md).
+- **Era GameData**: Essentials v19+ (nuevo). Ver [Engine Detection](03_ENGINE_DETECTION.md).
+- **GameData**: API de datos en Essentials (era GameData). Ver [Data API](05_DATA_API.md).
+- **Provider**: Adaptador para diferentes versiones. Ver [Data API](05_DATA_API.md).
+- **Hook**: Interceptar un método sin modificar el archivo. Ver [Patching & Hooks](04_PATCHING_AND_HOOKS.md).
+- **A***: Algoritmo de búsqueda de ruta. Ver [Pathfinding](06_PATHFINDING.md).
+- **HRTF**: Audio 3D binaural. Ver [Audio3D](07_AUDIO3D.md).
+- **Manifest**: Lista ordenada de módulos a cargar. Ver [Loading System](09_LOADING_SYSTEM.md).
+- **Preload**: Script que se ejecuta ANTES del juego. Ver [Loading System](09_LOADING_SYSTEM.md).
+- **eval()**: Ejecutar código Ruby como string. Ver [Ruby Fundamentals](08_RUBY_FUNDAMENTALS.md).
+- **Emitter**: Fuente de sonido 3D. Ver [Audio3D](07_AUDIO3D.md).
+- **Oclusión**: Sonido amortiguado al atravesar paredes. Ver [Audio3D](07_AUDIO3D.md).
 
 ## 🚀 Próximos Pasos
 

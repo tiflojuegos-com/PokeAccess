@@ -65,7 +65,7 @@ module PokeAccess
     def self.write
       File.open(FILE, "w") do |f|
         f.write("# Configuracion del mod de accesibilidad\n")
-        f.write("# volumenes 0-100; sound_nav off/full\n")
+        f.write("# volumenes 0-100; sound_nav off/basic/full\n")
         kinds = NUMERIC.dup
         kinds.push(:flag)
         kinds.concat(SYMS)

@@ -161,7 +161,7 @@ $ cat accessibility/data/loader_error.txt
 $ cat accessibility/data/preload_started.txt
 
 # 3. Generar diagnóstico (Ctrl+Alt+F9 en juego)
-$ cat accessibility/diag.txt
+$ cat accessibility/data/diag.txt
 ```
 
 ## Contribuir: Pasos

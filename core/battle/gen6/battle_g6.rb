@@ -6,18 +6,19 @@
 # Battle messages (also captures the battle for the hp/field keys).
 PokeAccess::Hooks.before_hook("PokeBattle_Scene", :pbDisplayMessage) do |scene, args|
   PokeAccess::Battle.set_battle(scene.instance_variable_get(:@battle))
-  PokeAccess.speak(PokeAccess.clean(args[0]), false)
+  PokeAccess.speak_clean(args[0], false)
 end
 
 # Paused battle messages (exp gained, level up): routed via pbDisplayPaused, a different method than
 # pbDisplayMessage, so it needs its own hook.
 PokeAccess::Hooks.before_hook("PokeBattle_Scene", :pbDisplayPausedMessage) do |_s, args|
-  PokeAccess.speak(PokeAccess.clean(args[0]), false)
+  PokeAccess.speak_clean(args[0], false)
 end
 
 # Move-target selection in doubles: pbChooseTarget highlights the focused battler each frame via
-# pbUpdateSelected(index); read whoever is under the cursor as it moves.
-PokeAccess::Hooks.after_hook("PokeBattle_Scene", :pbUpdateSelected) do |scene, _r, args|
+# pbUpdateSelected(index); read whoever is under the cursor as it moves. hook_container because its original
+# drives the command/fight display's own hooked index setters internally; guarding it would mute those readers.
+PokeAccess::Hooks.after_hook("PokeBattle_Scene", :pbUpdateSelected, :hook_container => true) do |scene, _r, args|
   PokeAccess::Battle.announce_target(scene, args[0])
 end
 
@@ -25,7 +26,7 @@ end
 # text is set straight on the message window, not via pbDisplayMessage, so it is read here; the Si/No
 # options are a Window_CommandPokemon read by the generic hook.
 PokeAccess::Hooks.before_hook("PokeBattle_Scene", :pbShowCommands) do |_s, args|
-  PokeAccess.speak(PokeAccess.clean(args[0]), false)
+  PokeAccess.speak_clean(args[0], false)
 end
 
 # Command menu (also resets the info key to read the foe here). The first read after the menu opens is
@@ -35,7 +36,7 @@ PokeAccess::Hooks.after_hook("CommandMenuDisplay", :index=) do |disp, _r, args|
   cmds = disp.instance_variable_get(:@window).instance_variable_get(:@commands)
   v = args[0]
   opening = PokeAccess::Battle.cmd_opening_consume
-  PokeAccess.speak(PokeAccess.clean(cmds[v]), !opening) if cmds && cmds[v].is_a?(String)
+  PokeAccess.speak_clean(cmds[v], !opening) if cmds && cmds[v].is_a?(String)
 end
 
 # The command menu opens at the start of the command phase via pbCommandMenu/Ex (which sets the initial
@@ -46,25 +47,25 @@ end
   end
 end
 
-# Move selection: read only when the focused move actually changes, so pressing a direction toward an
-# empty slot (the move does not move) is not mistaken for a re-read.
+# Move selection: read only when the focused move actually changes, so pressing a direction toward an empty
+# slot (the move does not move) is not mistaken for a re-read. An empty/absent slot passes key nil, which
+# Cursor treats as unchanged, so it neither speaks nor records -- returning to the same real move still reads.
 PokeAccess::Hooks.after_hook("FightMenuDisplay", :setIndex) do |disp, _r, _a|
   b = disp.instance_variable_get(:@battler)
   idx = disp.instance_variable_get(:@index)
-  if b && b.moves[idx] && b.moves[idx].id != 0 &&
-     idx != disp.instance_variable_get(:@access_last)
-    disp.instance_variable_set(:@access_last, idx)
+  ok = b && b.moves[idx] && b.moves[idx].id != 0
+  PokeAccess::Cursor.on_change(disp, :fight_move, ok ? idx : nil) do
     m = b.moves[idx]
     t = m.name.to_s
     t += ". " + PokeAccess::I18n.t(:mv_pp, :pp => m.pp, :tot => m.totalpp) if m.respond_to?(:pp)
-    PokeAccess.speak(PokeAccess.clean(t), true)
+    PokeAccess.speak_clean(t, true)
     PokeAccess::Info.set_info(:move, m)
   end
 end
 
 # Reset the dedup when the menu is set up for a battler, so the move is read on open.
 PokeAccess::Hooks.after_hook("FightMenuDisplay", :battler=) do |disp, _r, _a|
-  disp.instance_variable_set(:@access_last, nil)
+  PokeAccess::Cursor.reset(disp, :fight_move)
 end
 
 # Mega button (gen-6, one-way): announce when it flips to registered.

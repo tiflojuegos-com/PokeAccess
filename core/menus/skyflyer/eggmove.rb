@@ -5,9 +5,9 @@ module PokeAccess
   # The bare name is already read by the generic command hook, so its window is muted to avoid a double read.
   module SkyEggMove
     def self.detail(scene)
-      pk = (scene.instance_variable_get(:@pokemon) rescue nil)
-      moves = (scene.instance_variable_get(:@moves) rescue nil)
-      win = ((scene.instance_variable_get(:@sprites) || {})["commands"] rescue nil)
+      pk = PokeAccess.ivar(scene, :@pokemon)
+      moves = PokeAccess.ivar(scene, :@moves)
+      win = PokeAccess.sprite(scene, "commands")
       idx = (win.index rescue nil)
       return unless pk && moves.is_a?(Array) && idx && idx >= 0 && idx < moves.length
       d = (GameData::Move.get(moves[idx]) rescue nil)
@@ -28,7 +28,7 @@ end
 
 # Mute the generic bare-name read of the move window, then read the full detail on each redraw.
 PokeAccess::Hooks.after_hook("EggMoveLearner_Scene", :pbStartScene) do |scene, _r, _a|
-  w = ((scene.instance_variable_get(:@sprites) || {})["commands"] rescue nil)
+  w = PokeAccess.sprite(scene, "commands")
   w.instance_variable_set(:@ignore_input, true) if w
 end
 PokeAccess::Hooks.after_hook("EggMoveLearner_Scene", :pbDrawMoveList) do |scene, _r, _a|

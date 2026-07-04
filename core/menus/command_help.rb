@@ -23,7 +23,7 @@ module PokeAccess
     def self.note(win, serves, raw)
       return unless current == serves && (PokeAccess::Config.read_help rescue true)
       txt = PokeAccess.clean(raw.to_s)
-      return if txt.empty? || txt == (win.instance_variable_get(:@access_cmdhelp) rescue nil)
+      return if txt.empty? || txt == PokeAccess.ivar(win, :@access_cmdhelp)
       win.instance_variable_set(:@access_cmdhelp, txt)
       PokeAccess::Info.set_info(:text, txt)
       PokeAccess.speak(txt, false)

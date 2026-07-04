@@ -22,7 +22,7 @@ PokeEssentialsAccess utiliza un modelo de **capas escalonadas** donde cada capa 
 | Archivo | Responsabilidad |
 |---------|-----------------|
 | `config.rb` | Definición de todas las opciones de usuario |
-| `const.rb` | Resolución de constantes "A::B::C" 1.8.7-safe (`const_at`/`const?`) -- la primitiva que usan Hooks, Input y `Engine.has?` |
+| `const.rb` | Introspección 1.8.7-safe: resolución de constantes "A::B::C" (`const_at`/`const?`) e ivars/sprites de escenas (`ivar`/`ivar_i`/`sprite`) -- la primitiva que usan Hooks, Input y `Engine.has?` |
 | `engine.rb` | Detección de engine por API de datos (`gamedata?`/`gen6?`) y gate por capacidad (`has?`) |
 | `world.rb` | Fachada de globales del juego (mapa, jugador, bolsa...), engine-independiente; `want` loguea ausencias |
 | `events.rb` | Bus de eventos interno (suscripción/emisión) |
@@ -34,7 +34,7 @@ PokeEssentialsAccess utiliza un modelo de **capas escalonadas** donde cada capa 
 | `clipboard.rb` | Acceso al portapapeles (Win32API) |
 | `perf.rb` | Monitoreo de rendimiento |
 | `tags.rb` | Etiquetas de usuario para objetos |
-| `hooks.rb` | Sistema de patching (hooks before/after) |
+| `map_names.rb` | Nombres legibles de mapas |
 
 **Ejemplo de dependencia**:
 ```
@@ -110,9 +110,10 @@ PokeAccess::Data.species_name(123)  # → llama al provider activo
 | Módulo | Función |
 |--------|---------|
 | `speech/speech.rb` | SRAL.dll para síntesis de voz (Win32API) |
+| `speech/text.rb` | Normalización/limpieza de texto hablado |
 | `speech/markers.rb` | Logging de diagnóstico |
-| `input/input.rb` | Polling de teclado (GetAsyncKeyState) |
-| `input/hooks.rb` | Hooks para eventos de entrada |
+| `input/input.rb` | Polling de teclado (`Keys.global_poll`, `run_frame_pollers`) |
+| `input/hooks.rb` | Semi-API de patching: `before_hook`/`after_hook`/`around_hook`/`frame_hook`/`wrap_global`/`wrap_kernel` con guarda de reentrancia (ver [04](04_PATCHING_AND_HOOKS.md)) |
 | `input/remap.rb` | Remapeo de controles |
 
 **Ejemplo: Síntesis de voz**:
@@ -184,7 +185,7 @@ core/menus/
 ├── command_help.rb          ← Línea de ayuda de pbShowCommandsWithHelp / pbShowCommandsRogue
 ├── battle_point_shop.rb     ← Lector opt-in de la tienda de PB (BattlePointShop.define)
 ├── sprite_button_menu.rb    ← Lector opt-in de menús de pausa de sprites (SpriteButtonMenu.define)
-├── options.rb               ← Pantalla de opciones (value_of: gen-6 optstart / v21 lowest_value / v22 hash)
+├── options.rb               ← Pantalla de opciones clásica (value_of: gen-6 optstart / v21 lowest_value; v22 va aparte en v22/options_v22.rb, opciones-hash)
 ├── pokedex_entry.rb         ← Entrada de Pokédex
 ├── v21/                     ← Lectores de las clases pre-rework (Battle::Scene, scenes/MUI)
 └── v22/                     ← Lectores del rework UI:: (UI::*Visuals)
@@ -282,6 +283,7 @@ nuevo, añádelo a esta tabla y al CI.)
 | Pokémon Realidea | `realidea` | gen-6 |
 | Pokémon Armonía | `armonia` | gen-6 |
 | Pokémon Africanvs | `africanus` | gen-6 |
+| Pokémon Awakening | `awakening` | gen-6 |
 | Pokémon Añil | `anil` | era GameData (Ruby 3.x, v21.1) |
 | Pokémon Royal | `royal` | era GameData (fork de Sky / DBK) |
 | Relict | `relict` | era GameData (fork de Sky / DBK) |
@@ -422,7 +424,7 @@ ausente esperado se loguea una vez (`World.want`) en vez de tragarse, así un le
 ### Profiling
 
 ```ruby
-# Ctrl+Alt+F9 genera/anexa accessibility/diag.txt (Ctrl+Alt+F8 activa/desactiva el mod entero;
+# Ctrl+Alt+F9 genera/anexa accessibility/data/diag.txt (Ctrl+Alt+F8 activa/desactiva el mod entero;
 # Ctrl+Alt+F10 HABLA un diag corto: escena / mapa+pos / última lectura / hooks ausentes).
 # diag.txt contiene timings en ms y una sección "runtime introspection" para diagnosticar
 # pantallas mudas (clase del $scene, sus métodos e ivars). Ver docs/14_EXTENDING.md §6.

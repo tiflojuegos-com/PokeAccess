@@ -7,24 +7,30 @@ Visualización completa de cómo los módulos dependen unos de otros.
 ```
 MKXP-Z Engine (C++/Ruby Runtime)
     ↓
-Graphics.update [hooked]
+Graphics.update [envuelto en preload_access.rb]
     ↓
-AccessPreload (preload_access.rb)
-    │ Espera: ¿$scene definido? o ¿120 frames?
+AccessPreload (loader/preload_access.rb)
+    │ Espera: ¿$scene definido? o ¿READY_FRAME (120) frames?
     ↓
-PokeAccessBoot.run (boot.rb)
-    ├─ load_manifest("core")
-    ├─ load_manifest("game")
+PokeAccessBoot.run (loader/boot.rb)
+    ├─ load_manifest("accessibility/core")
+    ├─ load_manifest("accessibility/game")
     ├─ PokeAccess::Settings.apply
-    └─ Diagnósticos
+    └─ Diagnósticos (hooks sin método, Data en emergencia, i18n sin paridad)
     ↓
 PokeAccess Fully Loaded
 ```
 
 ## Jerarquía de Carga: CORE
 
+El orden real y COMPLETO de carga vive en `core/manifest.rb` (un array `%w[...]` de entradas
+`subsistema/nombre`, sin `.rb`, evaluado por `loader/boot.rb` en ese orden exacto). El árbol de abajo
+es un extracto ilustrativo de los módulos fundacionales; hay más módulos (menús, battle por versión,
+party, field, nav) que el manifest carga después. Para saber qué se carga y en qué orden, consulta
+siempre el manifest, no este extracto.
+
 ```
-core/manifest.rb (Orden de carga)
+core/manifest.rb (extracto del orden de carga)
 ├── foundation/config
 │   └─ SCHEMA = [[:language, :es, ...], ...]
 │      KIND_BOUNDS = {:vol => [0, 100, ...], ...}
@@ -44,6 +50,9 @@ core/manifest.rb (Orden de carga)
 │
 ├── util/text
 │   └─ Util.join_parts(partes), Util.types_phrase(t1, t2) - ensamblado de líneas habladas
+│
+├── util/player
+│   └─ Util.playtime_parts(secs), Util.badge_count(who) - helpers de datos del entrenador
 │
 ├── foundation/game
 │   └─ Sistema para definir juegos específicos
@@ -122,9 +131,9 @@ core/manifest.rb (Orden de carga)
 │   └─ Depende de: markers
 │
 ├── input/hooks
-│   ├─ Definición del sistema de hooks
-│   └─ before_hook(), after_hook(), missing()
-│      Depende de: nada (Win32API puro)
+│   ├─ Semi-API de hooks: before_hook / after_hook / around_hook / frame_hook / wrap_global / wrap_kernel
+│   ├─ Guarda de reentrancia (@active, nested_other?, guarded); container/frame corren el original sin guarda
+│   └─ Depende de: nada (base de todo lector); ver docs de la API de hooks
 │
 ├── input/remap
 │   └─ Remapeo de controles
@@ -391,12 +400,12 @@ menus/config_menu
 ├─ Depende de: Config schema, I18n, Speech
 
 menus/v21/pausemenu_v21
-├─ Adaptador para v21 (se ata si la clase/método existe)
-├─ Depende de: menus/neo_pausemenu
+├─ Adaptador para v21 (PokemonPauseMenu_Scene#pbShowCommands; se ata vía SceneWatcher.wire)
+├─ Depende de: menus/scene_watcher (wire), menus/menus (generic_focus), Speech
 
 menus/v22/pausemenu_v22
-├─ Adaptador para v22 (se ata si la clase/método existe)
-├─ Depende de: menus/neo_pausemenu
+├─ Adaptador para v22 (engancha UI::PauseMenuVisuals si la clase existe)
+├─ Depende de: Hooks, menus/v22/screen_v22 (V22.const_exists?), Speech
 ```
 
 ## Importancia Relativa
@@ -546,9 +555,12 @@ Para agregar `core/mi_modulo/mi_modulo.rb`:
 Si un módulo no se carga:
 
 ```bash
+# boot.rb escribe a #{PokeAccess::Paths::DATA}/loader_error.txt (la carpeta de datos resuelta,
+# que puede ser AppData si el juego es de solo lectura). Antes de que Paths cargue, cae a
+# accessibility/data/loader_error.txt.
 $ cat accessibility/data/loader_error.txt
 
-mi_modulo/mi_modulo: NoMethodError: undefined method 'speak' for PokeAccess:Module
+mi_modulo/mi_modulo.rb: NoMethodError: undefined method 'speak' for PokeAccess:Module
   # Significa: mi_modulo intentó usar PokeAccess.speak
   # Pero speech/speech no se había cargado aún
   # SOLUCIÓN: Mover mi_modulo más abajo en manifest

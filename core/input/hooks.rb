@@ -6,6 +6,45 @@ module PokeAccess
     @missing = []
     @body_logged = []
     @reg_seq = 0
+    @active = []
+
+    # Reentrancy guard. The game is single-threaded, so a module stack of the method names whose ORIGINAL is
+    # currently running is enough: an ATOMIC after_hook pushes around its original, and wrap's dispatcher skips
+    # a nested hooked call whose method name DIFFERS from the one on top. This stops an after-hook whose
+    # original synchronously calls a DIFFERENT hooked method (e.g. v22 set_party_index -> refresh) from letting
+    # the inner hook speak and consume the outer's dedup: the OUTER after-hook, running once the original
+    # returns, is the authoritative announcer. A nested call of the SAME method name is allowed through, so an
+    # overriding child that reaches its hooked parent via super still fires both hooks (the documented onion).
+    #
+    # The guard is correct ONLY for atomic announcers (methods whose own body is the voice). Two kinds of hook
+    # must run their original UNGUARDED or they silence the very readers that do the talking:
+    #   - a CONTAINER (`hook_container: true`): a modal loop or scene opener that DELEGATES the announcement to
+    #     hooked methods it drives internally -- the battle command phase (pbShowCommands/pbCommandMenu drive
+    #     CommandMenuDisplay#index= and FightMenuDisplay#setIndex), scene openers (pbScene/pbStartScene/main
+    #     drive the pokedex drawPage, the summary drawPageOne, the party panel selected=, the map readers).
+    #   - a per-frame DRIVER (`frame_hook`): a method the engine calls every frame that CAN synchronously host
+    #     an entire nested modal loop. Game_Player#update is the case that forced this: in gen-6 stepping onto
+    #     grass launches the wild battle from INSIDE Game_Player#update (Scene_Map#update -> $game_player.update
+    #     -> encounter -> the whole battle loop), so guarding it pins :update on the stack for the entire fight
+    #     and every battle reader -- messages, command menu, moves -- is skipped as nested_other?. A trainer
+    #     battle runs from the map interpreter, not the player, so it was unaffected: the bug read as "wild
+    #     battles are silent, trainer battles read". frame_hook is the poller-shaped alias of hook_container.
+    # Default is atomic (guarded), so a hook that itself says nothing keeps the safe behaviour. before_hook
+    # bodies always run before the original (so they never compete for a dedup) and never guard their original.
+    def self.nested_other?(meth)
+      !@active.empty? && @active.last != meth
+    end
+
+    # Runs the original of an atomic after-hook for meth with its name pushed on the active stack, always
+    # popping (ensure) so a throwing original never leaves nested hooks permanently muted.
+    def self.guarded(meth)
+      @active.push(meth)
+      begin
+        yield
+      ensure
+        @active.pop
+      end
+    end
 
     # Bindings whose class exists but whose method does not -- almost always a typo'd method name (an
     # absent class is normal cross-game variance and is NOT recorded). Boot writes this to a marker.
@@ -32,6 +71,7 @@ module PokeAccess
       k.send(:alias_method, orig, meth) unless own.include?(orig)
       chains = @chains
       k.send(:define_method, meth) do |*args, &blk|
+        return send(orig, *args, &blk) if PokeAccess::Hooks.nested_other?(meth)
         call = lambda { send(orig, *args, &blk) }
         chains[key].reverse_each do |w|
           nxt = call
@@ -64,16 +104,37 @@ module PokeAccess
       "#{cname}##{meth}@#{@reg_seq}"
     end
 
-    # Runs body before the original (to speak before it blocks). Yields (instance, args).
+    # Runs body before the original (to speak before it blocks). Yields (instance, args). The original runs
+    # UNGUARDED so a modal loop or scene opener it wraps (pbScene, pbStartScene, main) can still drive its
+    # nested announcing hooks; the body already spoke before the original, so nothing it owns is at risk.
     def self.before_hook(cname, meth, &body)
       key = next_key(cname, meth)
       wrap(cname, meth) { |inst, nxt, args| run_body(key) { body.call(inst, args) }; nxt.call }
     end
 
-    # Runs body after the original, passing its result. Yields (instance, result, args).
-    def self.after_hook(cname, meth, &body)
+    # Runs body after the original, passing its result. Yields (instance, result, args). By default the
+    # original runs under the reentrancy guard, so a DIFFERENT hooked method it calls internally is not
+    # re-announced and cannot consume this hook's dedup before the body speaks. Pass hook_container: true when
+    # the method is a modal loop or scene opener that DELEGATES the announcement to hooked methods it drives
+    # internally (see nested_other?): the original then runs UNGUARDED so those nested readers still speak.
+    def self.after_hook(cname, meth, opts = {}, &body)
       key = next_key(cname, meth)
-      wrap(cname, meth) { |inst, nxt, args| r = nxt.call; run_body(key) { body.call(inst, r, args) }; r }
+      container = opts[:hook_container]
+      wrap(cname, meth) do |inst, nxt, args|
+        r = container ? nxt.call : guarded(meth) { nxt.call }
+        run_body(key) { body.call(inst, r, args) }
+        r
+      end
+    end
+
+    # An after-hook for a per-frame DRIVER -- a method the engine calls every frame that can synchronously host
+    # a whole nested modal loop (Game_Player#update, which in gen-6 runs an entire wild battle inside itself).
+    # Runs the original UNGUARDED (like hook_container) so readers driven inside that nested loop still speak,
+    # and runs the body AFTER so a poller reading the post-update frame state (the player's new tile for the
+    # spatial audio) has no lag. Semantically a poller, not an announcing container, so it gets its own name.
+    # Yields (instance, args); a per-frame poller has no use for the original's return value. 1.8.7-safe.
+    def self.frame_hook(cname, meth, &body)
+      after_hook(cname, meth, :hook_container => true) { |inst, _r, args| body.call(inst, args) }
     end
 
     # Wraps a method with full control of the call. Yields (instance, call_next, args); returns the result.

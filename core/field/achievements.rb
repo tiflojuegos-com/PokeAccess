@@ -25,8 +25,8 @@ module PokeAccess
     def self.poll
       s = @scene
       return unless s
-      idx = (s.instance_variable_get(:@indexSel) rescue nil)
-      logros = (s.instance_variable_get(:@logros) rescue nil)
+      idx = PokeAccess.ivar(s, :@indexSel)
+      logros = PokeAccess.ivar(s, :@logros)
       return if idx.nil? || logros.nil? || idx == @last
       @last = idx
       l = (logros[idx] rescue nil)

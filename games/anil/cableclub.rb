@@ -8,6 +8,6 @@ end
 
 PokeAccess::Game.define("anil") do
   before("CableClub_Scene", :pbShowCommands) do |_s, args|
-    PokeAccess.speak(PokeAccess.clean(args[0]), false)
+    PokeAccess.speak_clean(args[0], false)
   end
 end

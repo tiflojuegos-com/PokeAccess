@@ -5,7 +5,7 @@
 # Sky/Relict EncounterList_Scene the core reader hooks, hence a game-specific reader. Guarded: no-op where absent.
 PokeAccess::Game.define("pokemon_z") do
   after("EncounterListUI", :getEncData) do |scene, _r, _a|
-    enc = (scene.instance_variable_get(:@encarray) rescue nil)
+    enc = PokeAccess.ivar(scene, :@encarray)
     loc = ($game_map.name rescue nil).to_s
     if !enc.is_a?(Array) || enc == [7] || enc.empty?
       PokeAccess.speak(PokeAccess::I18n.t(:enc_none, :loc => loc), true)

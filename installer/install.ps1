@@ -7,7 +7,7 @@
   Uso:
     - Ejecuta "Instalar mod.bat": se abre un selector de carpetas para elegir el juego y
       el perfil se detecta solo (o se pregunta). Tambien puedes arrastrar la carpeta encima.
-    - powershell -ExecutionPolicy Bypass -File install.ps1 "<carpeta del juego>" [pokemon_z|opalo|reminiscencia|anil|royal|armonia|relict|realidea|generic]
+    - powershell -ExecutionPolicy Bypass -File install.ps1 "<carpeta del juego>" [pokemon_z|opalo|reminiscencia|anil|royal|armonia|relict|realidea|africanus|awakening|generic]
 #>
 param([string]$GameDir, [string]$Game = "", [switch]$Check, [switch]$Force)
 

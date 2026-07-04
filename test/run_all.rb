@@ -4,7 +4,8 @@
 # and re-invokes itself for the gamedata engine. Usage:
 #   ruby test/run_all.rb                  # both engines + static checks
 #   ruby test/run_all.rb behavior/battle  # only specs whose path matches the filter (current engine)
-# Exit code is non-zero if any assertion failed (i18n parity is a warning, never fails).
+# Exit code is non-zero if any assertion failed. That includes i18n parity: the static spec asserts
+# it, so a drifted lang/ key fails CI on purpose (the runner's own parity print is just a warning).
 SUPPORT = File.expand_path("support", File.dirname(__FILE__))
 require File.join(SUPPORT, "harness")
 require File.join(SUPPORT, "framework")
@@ -31,9 +32,23 @@ testdir = File.expand_path(File.dirname(__FILE__))
 specs = Dir.glob(File.join(testdir, "{unit,behavior,static}", "**", "*_spec.rb")).sort
 specs = specs.select { |p| ENGINE == :gamedata ? p =~ /_gd_spec\.rb$/ : p !~ /_gd_spec\.rb$/ }
 specs = specs.select { |p| p.include?(FILTER) } if FILTER
-specs.each { |f| require f }
 
 Assert.pass = 0; Assert.fail = 0; Assert.failures = []
+
+# Loading a spec runs its top-level code (requires, target class/method setup). A failure there -- a renamed
+# game file required by a spec, a typo in a spec's top-level -- must be attributed to that file and not abort
+# the whole run: without this the exception propagates, sibling specs never load, the gamedata pass is skipped
+# and no summary prints. Mirrors how harness reports a toolkit load error as its own failure, not a crash.
+specs.each do |f|
+  begin
+    require f
+  rescue StandardError, LoadError => e
+    Assert.suite = File.basename(f)
+    Assert.check("spec failed to load", false, "#{e.class}: #{e.message}")
+    puts "  FAIL(load)  #{File.basename(f)}"
+  end
+end
+
 Suite.all.each do |name, body|
   Reset.between_suites
   Assert.suite = name

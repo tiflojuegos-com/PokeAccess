@@ -13,9 +13,9 @@ module PokeAccess
     def self.rematch_ready?(i)
       sc = @scene
       return false unless sc
-      cts = (sc.instance_variable_get(:@contacts) rescue nil)
+      cts = PokeAccess.ivar(sc, :@contacts)
       return (cts[i].can_rematch? rescue false) if cts && cts[i]
-      trs = (sc.instance_variable_get(:@trainers) rescue nil)
+      trs = PokeAccess.ivar(sc, :@trainers)
       t = (trs ? trs[i] : nil)
       (t.is_a?(Array) && t.length > 3) ? !!t[3] : false
     rescue StandardError

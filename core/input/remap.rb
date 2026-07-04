@@ -25,8 +25,6 @@ module PokeAccess
     DIR_CODE = { :up => 8, :down => 2, :left => 4, :right => 6 }
     @held = {}
 
-    #extra actions registry
-
     # The registry of game extras: action symbol => [default virtual-key, label].
     def self.extras; @extras ||= {}; end
 
@@ -36,9 +34,13 @@ module PokeAccess
     end
 
     # The full remap-menu action list: base buttons, game extras, and a final reset-all entry.
+    # Built on a duped array with concat/push, never BUTTONS + [...]: Pokemon Z's MTS library
+    # redefines Array#+ as an in-place mutator, so the literal `+` would corrupt the constant.
     def self.buttons
-      BUTTONS + extras.map { |sym, info| [sym, nil, info[1]] } +
-        [[:__reset__, nil, :btn_reset_all]]
+      list = BUTTONS.dup
+      list.concat(extras.map { |sym, info| [sym, nil, info[1]] })
+      list.push([:__reset__, nil, :btn_reset_all])
+      list
     end
 
     #labels and lookups

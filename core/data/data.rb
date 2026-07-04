@@ -65,6 +65,7 @@ module PokeAccess
     def self.move_description(id); resolve(:move_description, id); end
     def self.type_name(id);        resolve(:type_name, id); end
     def self.item_name(id);        resolve(:item_name, id); end
+    def self.item_name_plural(id);  resolve(:item_name_plural, id); end
     def self.item_description(id); resolve(:item_description, id); end
     def self.species_name(id);     resolve(:species_name, id); end
     def self.species_entry(id);    resolve(:species_entry, id); end

@@ -21,8 +21,8 @@ module PokeAccess
 
     # Speaks a panel's name.
     def self.say_panel(panel)
-      nm = (panel.instance_variable_get(:@nombre) rescue nil)
-      PokeAccess.speak(PokeAccess.clean(nm.to_s), true) if nm && !nm.to_s.empty?
+      nm = PokeAccess.ivar(panel, :@nombre)
+      PokeAccess.speak_clean(nm.to_s, true) if nm && !nm.to_s.empty?
     rescue StandardError
       nil
     end

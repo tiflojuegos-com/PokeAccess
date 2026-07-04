@@ -20,8 +20,16 @@ end
 # so the first option is read, queued (interrupt false) so the reopening command menu does not cut the
 # hp/turn lines. Bound only where the method exists, so v22 (which opens via set_index_and_commands, handled
 # in battle_v22) does not record a false typo in Hooks.missing.
+# setIndexAndMode assigns @mode directly (NOT via the mode= setter), so the mega hook below never sees the
+# fight menu open; prime @access_mega with the opening mode (arg 1: 1=available, 0=hidden) so the first real
+# available->registered toggle is announced instead of being swallowed as if it were the open. Mirrors how
+# v22 primes @access_mega via its mega_evolution_state= reveal.
 if PokeAccess::Engine.has?("Battle::Scene::MenuBase#setIndexAndMode")
-  PokeAccess::Hooks.after_hook("Battle::Scene::MenuBase", :setIndexAndMode) do |menu, _r, _a|
+  PokeAccess::Hooks.after_hook("Battle::Scene::MenuBase", :setIndexAndMode) do |menu, _r, args|
+    if defined?(::Battle::Scene::FightMenu) && menu.is_a?(::Battle::Scene::FightMenu)
+      m = args[1]
+      menu.instance_variable_set(:@access_mega, m) if m == 1 || m == 2
+    end
     PokeAccess::BattleScene.read_menu(menu, false)
   end
 end

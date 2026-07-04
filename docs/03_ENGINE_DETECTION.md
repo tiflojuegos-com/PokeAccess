@@ -152,15 +152,17 @@ sin tocar el código. `Engine.has?` es el único punto para preguntarlo, y acept
 
 ```ruby
 # 1) un símbolo de capacidad registrada (las transversales, en Engine::CAPABILITIES):
-Engine.has?(:ui_rework)     # ¿existe el rework UI:: de v22?
+Engine.has?(:ui_rework)     # ¿existe el rework UI:: de v22? (probe "UI::BaseScreen")
 Engine.has?(:gamedata)      # ¿usa la API GameData?
+Engine.has?(:gen6)          # ¿es la era gen-6?
 Engine.has?(:sky_fork)      # ¿es el fork de Sky?
+Engine.has?(:battle_scene)  # ¿existe Battle::Scene (era v19+)?
 
 # 2) un nombre de clase "A::B::C" (resuelto 1.8.7-safe vía PokeAccess.const_at):
 Engine.has?("UI::BagVisuals")
 
 # 3) "Clase#metodo" para exigir además un método (clave para forks que backportean):
-Engine.has?("Battle::Scene#setIndexAndMode")
+Engine.has?("Battle::Scene::MenuBase#setIndexAndMode")
 ```
 
 Si v23 renombra una clase, basta actualizar su entrada en `CAPABILITIES` (un sitio) y todos los lectores
@@ -205,7 +207,7 @@ load_manifest("core")  # Carga todo, inclusive battle_g6.rb y battle_v21.rb
 # Solo existe PokeBattle_Scene en gen-6, así que estos hooks NO-OP en la era GameData
 PokeAccess::Hooks.before_hook("PokeBattle_Scene", :pbDisplayMessage) do |scene, args|
   # This block only runs if PokeBattle_Scene exists (gen-6)
-  PokeAccess.speak(args[0], false)
+  PokeAccess.speak_clean(args[0], false)
 end
 
 # En battle_v21.rb:
@@ -235,7 +237,7 @@ PokeAccess::Data.register(10, PokeAccess::DataG6) if defined?(PBMoves) && !defin
 module PokeAccess::DataV21
   def self.species_name(id); (GameData::Species.get(id).name rescue nil); end
 end
-PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData)
+PokeAccess::Data.register(20, PokeAccess::DataV21) if defined?(GameData) && defined?(GameData::Move)
 
 # Uso (funciona en ambas versiones):
 PokeAccess::Data.species_name(123)  # Automáticamente usa el provider activo
@@ -265,7 +267,7 @@ end
 ### Tecla de Diagnóstico: Ctrl+Alt+F9
 
 ```
-# Genera/anexa accessibility/diag.txt. La sección de escena incluye, p.ej.:
+# Genera/anexa accessibility/data/diag.txt. La sección de escena incluye, p.ej.:
 ...
 scene=Battle::Scene              ← clase de la escena actual
 in_menu=true
@@ -321,8 +323,9 @@ No se detecta automáticamente; es un plugin de Essentials que:
 **Manejo**:
 ```ruby
 # Gatear por capacidad (clase + método), no por versión: así se activa también en un fork que lo backportee.
-if PokeAccess::Engine.has?("Battle::Scene#pbToggleSpecialActions")
-  # el hook DBK se registra (los archivos skyflyer/dbk_* ya hacen este gate)
+# Ojo: pbToggleSpecialActions vive en Battle (no en Battle::Scene).
+if PokeAccess::Engine.has?("Battle#pbToggleSpecialActions")
+  # el hook DBK se registra (los archivos core/battle/skyflyer/dbk_* ya hacen este gate)
 end
 ```
 

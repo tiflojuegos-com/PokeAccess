@@ -12,9 +12,9 @@ module PokeAccess
     # orders pages dynamically, so a fixed 1..5 numbering would read the wrong page). Falls back to the
     # classic numbering for a base summary with no @page_id. param page the numeric page argument (fallback).
     def self.page_text(scene, page)
-      pk = (scene.instance_variable_get(:@pokemon) rescue nil)
+      pk = PokeAccess.ivar(scene, :@pokemon)
       return nil unless pk
-      pid = (scene.instance_variable_get(:@page_id) rescue nil)
+      pid = PokeAccess.ivar(scene, :@page_id)
       return legacy_page_text(pk, page) if pid.nil?
       case pid
       when :page_egg     then PokeAccess::I18n.t(:sm_egg)
