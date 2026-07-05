@@ -6,7 +6,7 @@
 # so load order does not matter). Mute the generic bare-name read and speak the full detail on each redraw.
 PokeAccess::Hooks.after_hook("MoveRelearner_Scene", :pbStartScene) do |scene, _r, _a|
   w = PokeAccess.sprite(scene, "commands")
-  w.instance_variable_set(:@ignore_input, true) if w
+  w.instance_variable_set(:@access_dedicated, true) if w
 end
 PokeAccess::Hooks.after_hook("MoveRelearner_Scene", :pbDrawMoveList) do |scene, _r, _a|
   PokeAccess::SkyEggMove.detail(scene)

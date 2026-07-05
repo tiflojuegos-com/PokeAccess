@@ -26,10 +26,11 @@ module PokeAccess
   end
 end
 
-# Mute the generic bare-name read of the move window, then read the full detail on each redraw.
+# Mute the generic bare-name read of the move window, then read the full detail on each redraw. Use the mod's
+# own @access_dedicated flag (not @ignore_input, which some Selectable windows use to gate their navigation).
 PokeAccess::Hooks.after_hook("EggMoveLearner_Scene", :pbStartScene) do |scene, _r, _a|
   w = PokeAccess.sprite(scene, "commands")
-  w.instance_variable_set(:@ignore_input, true) if w
+  w.instance_variable_set(:@access_dedicated, true) if w
 end
 PokeAccess::Hooks.after_hook("EggMoveLearner_Scene", :pbDrawMoveList) do |scene, _r, _a|
   PokeAccess::SkyEggMove.detail(scene)

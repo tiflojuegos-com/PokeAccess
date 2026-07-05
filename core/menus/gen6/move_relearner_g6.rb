@@ -31,9 +31,12 @@ module PokeAccess
   end
 end
 
+# Mute the generic bare-name read of the move list, but with the mod's own flag: on gen-6 the command
+# window gates its OWN navigation on @ignore_input (050_SpriteWindow), so setting that here would freeze the
+# player's cursor. @access_dedicated tells menus.rb to skip the window without touching the engine's input.
 PokeAccess::Hooks.after_hook("MoveRelearnerScene", :pbStartScene) do |scene, _r, _a|
   w = PokeAccess.sprite(scene, "commands")
-  w.instance_variable_set(:@ignore_input, true) if w
+  w.instance_variable_set(:@access_dedicated, true) if w
 end
 PokeAccess::Hooks.after_hook("MoveRelearnerScene", :pbDrawMoveList) do |scene, _r, _a|
   PokeAccess::MoveRelearnerGen6.detail(scene)
