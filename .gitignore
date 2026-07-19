@@ -26,3 +26,11 @@ graphify-out/
 native/out/
 native/miniaudio.h
 native/sdk/
+
+# games source folder, for debugging and developing of new script.
+# do not upload these things
+games_src/
+
+# debug folder. for store diagnostics files, on the fly scripts, and whatever what you use during a debugging process.
+debug/
+

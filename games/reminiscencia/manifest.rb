@@ -7,6 +7,7 @@
   blessings
   summary_extra
   command_help
+  move_relearner
   datingsim_place
   itemget
 ]
