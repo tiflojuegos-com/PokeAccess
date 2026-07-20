@@ -774,6 +774,8 @@ rem_dating_male=Male
 rem_dating_female=Female
 rem_dating_unknown=Unknown
 rem_dating_points=%{name}, %{n} points
+rem_heartscale_name=Heart Scale
+rem_heartscale_cost=Cost: %{n} %{item}
 
 # quest log (Marin's Quest)
 qu_ongoing=Ongoing: %{n}
