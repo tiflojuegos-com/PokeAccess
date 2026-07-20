@@ -15,9 +15,22 @@
 #   - the Heart Scale cost is computed by the game's own top-level moveCost(category, basedamage, id)
 #
 # Patch technique: hook AFTER pbDrawMoveList and publish a ready spoken line to PokeAccess::Info as :text.
-# This keeps the stock cursor reading intact, but makes T read the move currently highlighted in this menu,
-# including the Heart Scale cost that the generic move formatter does not know about.
+# This keeps T on the focused move and, for this game, overrides the core gen-6 relearner dedicated reader
+# so arrow navigation speaks only the move name (not the full detail), leaving full detail for T.
 module PokeAccess
+  # Core's gen-6 dedicated relearner hook calls MoveRelearnerGen6.detail on each redraw. For Reminiscencia
+  # we keep that dedicated path but simplify the spoken cursor line to the focused move name only.
+  module MoveRelearnerGen6
+    def self.detail(scene)
+      id = (focused_id(scene) rescue nil)
+      return if id.nil?
+      name = (PokeAccess::Data.move_name(id) rescue nil)
+      PokeAccess.speak(name.to_s, true) if name && !name.to_s.empty?
+    rescue StandardError
+      nil
+    end
+  end
+
   module ReminMoveRelearner
     # The move id currently focused by the custom relearner list, or nil.
     def self.focused_id(scene)
@@ -41,7 +54,9 @@ module PokeAccess
       return base unless movedata
       cost = (scene.send(:moveCost, movedata.category, movedata.basedamage, move_id) rescue nil)
       return base if cost.nil?
-      base + ". " + _INTL("{1} Escamas Corazón", cost)
+      item = PokeAccess::I18n.t(:rem_heartscale_name)
+      cost_text = PokeAccess::I18n.t(:rem_heartscale_cost, :n => cost, :item => item)
+      base + " " + cost_text
     rescue StandardError
       nil
     end

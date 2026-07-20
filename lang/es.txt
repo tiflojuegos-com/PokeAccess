@@ -774,6 +774,8 @@ rem_dating_male=Masculino
 rem_dating_female=Femenino
 rem_dating_unknown=Desconocido
 rem_dating_points=%{name}, %{n} puntos
+rem_heartscale_name=Escama Corazón
+rem_heartscale_cost=Coste: %{n} %{item}
 
 # favores / quest log (Marin's Quest)
 qu_ongoing=Activos: %{n}
